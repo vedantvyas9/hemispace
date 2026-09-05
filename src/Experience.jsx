@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import FixedCamera from "./FixedCamera";
+import Guide from "./Guide";
 import Scene from "./Scene";
-import { RevealCamera } from "./Reveal3D";
 import BrainPanel from "./BrainPanel";
 import { DEFAULTS } from "./neglect";
 
@@ -32,10 +32,25 @@ function fieldAzimuth(target, spawn) {
   return a;
 }
 
+/**
+ * Jump straight to a phase with ?phase=reveal.
+ *
+ * The reveal is the last thing in a five-minute sequence, which made every
+ * tweak to it cost two full rounds to see. It is worth being able to open it
+ * directly — for anyone working on the timing or the framing, and for showing
+ * the ending on its own.
+ */
+function fromUrl() {
+  if (typeof location === "undefined") return null;
+  const p = new URLSearchParams(location.search).get("phase");
+  return p === "reveal" || p === "declare" || p === "intro2" ? p : null;
+}
+
 export default function Experience({ onExit }) {
+  const jump = useMemo(fromUrl, []);
   const [scene, setScene] = useState(null);
-  const [phase, setPhase] = useState("intro");   // intro | run | declare | intro2 | reveal
-  const [round, setRound] = useState(1);
+  const [phase, setPhase] = useState(jump ?? "intro");   // intro | run | declare | intro2 | reveal
+  const [round, setRound] = useState(jump ? 2 : 1);
   const [found, setFound] = useState(new Set());
   const [left, setLeft] = useState(SECONDS);
   const [results, setResults] = useState([]);
@@ -44,6 +59,19 @@ export default function Experience({ onExit }) {
   const timerRef = useRef(null);
 
   useEffect(() => { fetch("/scene.json").then((r) => r.json()).then(setScene); }, []);
+
+  // A jumped-to reveal has no rounds behind it, so it gets a plausible pair:
+  // everything found the first time, only the right-hand half the second.
+  useEffect(() => {
+    if (!jump || !scene || results.length) return;
+    const missed = scene.targets
+      .filter((t) => fieldAzimuth(t, scene.spawn) < 0)
+      .map((t) => t.id);
+    setResults([
+      { round: 1, found: scene.targets.length, total: scene.targets.length, missed: [] },
+      { round: 2, found: scene.targets.length - missed.length, total: scene.targets.length, missed },
+    ]);
+  }, [jump, scene, results.length]);
 
   const neglect = round === 2 && phase !== "reveal" ? NEGLECT : CLEAN;
 
@@ -127,12 +155,15 @@ export default function Experience({ onExit }) {
       >
         {scene && (
           <>
-            {phase !== "reveal" && <FixedCamera spawn={scene.spawn} />}
-            <RevealCamera
-              active={phase === "reveal"}
-              targets={scene.targets.map((t) => t.position)}
-              spawn={scene.spawn}
-            />
+            {/* The camera does not move for the reveal either.
+                It used to lift out over the room, which meant the room had to
+                dissolve — a Marble capture is shot at eye height and has
+                nothing to page from above, so the ending was a bird's-eye view
+                of an empty grid, and the cut read as the render breaking.
+                Staying put is also the stronger beat: the same room, the same
+                view they just told you they had finished searching, and two
+                objects lighting up in it that were never there for them. */}
+            <FixedCamera spawn={scene.spawn} />
             <Scene
               scene={scene}
               neglect={neglect}
@@ -141,7 +172,12 @@ export default function Experience({ onExit }) {
               onFind={(id) => setFound((prev) => { const n = new Set(prev); n.add(id); return n; })}
               onWorldReady={() => setWorldReady(true)}
               reveal={phase === "reveal" && revealStep >= 2}
-              dissolve={phase === "reveal"}
+              /* The room used to dissolve here, because the reveal camera sat
+                 17m up and a Marble capture falls apart that far outside the
+                 volume it was shot in. From 4m, just behind where the
+                 participant stood, it holds — and keeping it is the point:
+                 they need to recognise the room they just failed to search. */
+              dissolve={false}
             />
           </>
         )}
@@ -158,17 +194,7 @@ export default function Experience({ onExit }) {
       )}
 
       {phase === "intro" && (
-        <div className="overlay">
-          <h1>Hemispace</h1>
-          <p>
-            You are standing still, looking at one room. Click every object you can
-            see. You have {SECONDS} seconds.
-          </p>
-          <button onClick={startRun} disabled={!worldReady}>
-            {worldReady ? "Start" : "Loading the room…"}
-          </button>
-          <button className="link" onClick={onExit}>Back</button>
-        </div>
+        <Guide seconds={SECONDS} ready={worldReady} onStart={startRun} onExit={onExit} />
       )}
 
       {phase === "intro2" && (

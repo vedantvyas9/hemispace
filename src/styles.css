@@ -167,3 +167,62 @@ button.link:hover { background: none; color: #a3b1c0; }
 .prog { width: min(560px, 92vw); margin: 20px auto 0; }
 .prog-t { font-size: 12.5px; color: #7a8898; margin-bottom: 6px; text-align: left; }
 @media (prefers-reduced-motion: reduce) { .tcue .arrow { animation: none; } }
+
+/* The 3D brain that closes the reveal. Sized so it reads at a glance without
+   swallowing the caption underneath it. */
+.brain3d { width: 100%; max-width: 460px; margin: 0 auto 6px; }
+.brain3d canvas { width: 100% !important; height: 260px !important; display: block; }
+.brain-scale {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10.5px; color: #7a8898; letter-spacing: .04em;
+}
+.brain-side { text-transform: uppercase; }
+.brain-track {
+  position: relative; flex: 1; height: 3px; border-radius: 2px;
+  background: #25303b;
+}
+.brain-mid {
+  position: absolute; left: 50%; top: -4px; width: 1px; height: 11px;
+  background: #4a5764;
+}
+.brain-needle {
+  position: absolute; top: -6px; width: 3px; height: 15px; border-radius: 2px;
+  background: #f0883e; transform: translateX(-1.5px);
+  box-shadow: 0 0 8px rgba(240,136,62,.6);
+}
+.brain-read { margin: 8px 0 0; font-size: 12px; color: #7a8898; text-align: center; }
+.brain-read b { color: #f0883e; font-size: 14px; }
+
+/* Callouts anchored to points on the brain. Kept small and quiet so the model
+   stays the thing you look at. */
+.brain-label {
+  white-space: nowrap; line-height: 1.25; letter-spacing: .01em;
+  font-size: 11px; text-shadow: 0 1px 4px rgba(0,0,0,.95), 0 0 10px rgba(0,0,0,.8);
+}
+.brain-label b { display: block; font-size: 11px; font-weight: 650; }
+.brain-label span { display: block; opacity: .72; font-size: 9.5px; }
+.brain-label.hurt b { color: #ff9a72; }
+.brain-label.ok   b { color: #8fc1f2; }
+.brain-label.dim  b { color: #b3bec9; }
+.brain-label span { color: #9aa7b4; }
+
+/* The walkthrough that stands in for a person explaining the piece. */
+.overlay.guide { background: rgba(9,12,16,.86); }
+.guide-card {
+  width: min(430px, 88vw); text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.guide-art {
+  width: 190px; height: 114px; margin-bottom: 6px;
+}
+.guide-card h2 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+.guide-card p {
+  margin: 4px 0 2px; max-width: 34ch; color: #9aa7b4;
+  font-size: 14px; line-height: 1.5;
+}
+.guide-dots { display: flex; gap: 7px; margin: 14px 0 4px; }
+.guide-dot {
+  width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%;
+  background: #2c3b47; cursor: pointer; transition: background .18s, transform .18s;
+}
+.guide-dot.on { background: #69a8e8; transform: scale(1.25); }

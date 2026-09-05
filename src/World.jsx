@@ -29,8 +29,19 @@ const DEFAULT_TRANSFORM = {
 export function MintWorld({ world, dissolve, onColliderReady, onReady }) {
   const { gl } = useThree();
   const spark = useMemo(() => new SparkRenderer({ renderer: gl }), [gl]);
+  // The camera is fixed, so there is no reason to spend quality on being ready
+  // to move. Spark drops detail as it pages, which is what produced the patchy,
+  // half-missing look; asking for quality and a generous LOD budget spends the
+  // headroom a static shot leaves lying around.
   const splat = useMemo(
-    () => new SplatMesh({ url: world.splatUrl, fileType: SplatFileType.RAD, paged: true, raycastable: false }),
+    () => new SplatMesh({
+      url: world.splatUrl,
+      fileType: SplatFileType.RAD,
+      paged: true,
+      raycastable: false,
+      lod: "quality",
+      lodScale: 2.5,
+    }),
     [world.splatUrl],
   );
   const { scene: colliderScene } = useGLTF(world.colliderUrl);
@@ -156,7 +167,8 @@ function Glow({ state, reveal, y, radius }) {
   return (
     <mesh ref={ref} position={[0, y, 0]} userData={{ glow: true }}>
       <sphereGeometry args={[radius, 16, 16]} />
-      <meshStandardMaterial color="#ffb26b" emissive="#ffb26b" emissiveIntensity={0} transparent opacity={0.9} />
+      <meshStandardMaterial color="#ffb26b" emissive="#ffb26b" emissiveIntensity={0}
+                            transparent opacity={0.42} depthWrite={false} />
       <pointLight color="#ffb26b" intensity={0} distance={3} />
     </mesh>
   );
@@ -205,7 +217,7 @@ function Model({ target, state, reveal, neglect }) {
   return (
     <group ref={groupRef}>
       <group scale={scale}><primitive object={cloned} /></group>
-      <Glow state={state} reveal={reveal} y={scale * 1.6} radius={scale * 0.45} />
+      <Glow state={state} reveal={reveal} y={scale * 0.75} radius={scale * 0.28} />
     </group>
   );
 }
