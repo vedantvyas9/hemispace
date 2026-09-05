@@ -71,9 +71,14 @@ code { font-family: ui-monospace, monospace; background: #21262d; padding: 1px 6
   display: flex; align-items: center; justify-content: space-between; }
 .ext-fix { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
   font-size: 34px; color: #8b98a5; }
-.ext-dot { width: 62px; height: 62px; border-radius: 50%; background: transparent;
-  transition: none; }
-.ext-dot.on { background: #f5f7fa; box-shadow: 0 0 26px rgba(245,247,250,.55); }
+.ext-field { width: min(1180px, 96vw); }
+.ext-dot { border-radius: 50%; background: transparent; transition: none; }
+/* The left stimulus. Identical in both conditions — this is the whole design. */
+.ext-dot.weak { width: 30px; height: 30px; }
+.ext-dot.weak.on { background: #7d8894; }
+/* The right stimulus carries the salience advantage the good side has in a patient. */
+.ext-dot.strong { width: 86px; height: 86px; }
+.ext-dot.strong.on { background: #ffffff; box-shadow: 0 0 46px rgba(255,255,255,.75); }
 .ext-hold { color: #7a8898; font-size: 14px; }
 .ext-answer { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .ext-answer p { color: #a3b1c0; margin: 0; }

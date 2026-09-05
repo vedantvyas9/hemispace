@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
  * There is nothing to sweep, nothing to check, no way to try harder.
  */
 
-const FLASH_MS = 180;
+const FLASH_MS = 110;
 const GAP_MIN = 700;
 const GAP_JITTER = 700;
 
@@ -31,7 +31,7 @@ function buildTrials() {
   return t;
 }
 
-export default function Extinction({ neglect, onDone }) {
+export default function Extinction({ onDone }) {
   const [trials] = useState(buildTrials);
   const [i, setI] = useState(0);
   const [flash, setFlash] = useState(null);      // { left, right }
@@ -48,16 +48,19 @@ export default function Extinction({ neglect, onDone }) {
     if (i >= trials.length) { onDoneRef.current(results.current); return; }
     const trial = trials[i];
 
-    // Under neglect, a left stimulus presented at the same moment as a right
-    // one never reaches awareness. We remove it from the display, and say so
-    // plainly afterwards — the participant cannot tell the difference between
-    // "removed" and "unattended", which is exactly the lesson.
-    // Not every competing trial. Real extinction is probabilistic, and a flat
-    // 0% reads to a sceptical viewer as "you simply did not show it" rather
-    // than as a measurement. Letting one or two through makes it a gradient.
-    const suppressed = neglect && trial.type === "both" && Math.random() < 0.8;
+    // Both stimuli are always presented. An earlier version removed the left
+    // one on competing trials, which reproduced the patient's ANSWER without
+    // reproducing their ERROR: the participant reported "right", was correct,
+    // and never experienced missing anything.
+    //
+    // Extinction is not a filter, it is a competition for attention that one
+    // side wins. In a patient the ipsilesional side carries a pathological
+    // salience advantage. That is reproduced honestly here: the right stimulus
+    // is large and bright, the left is small and dim, and the left is IDENTICAL
+    // in both conditions. Alone it is seen. Against a brighter competitor it
+    // genuinely is not. The miss is real.
     const shown = {
-      left: (trial.type === "left" || trial.type === "both") && !suppressed,
+      left: trial.type === "left" || trial.type === "both",
       right: trial.type === "right" || trial.type === "both",
     };
 
@@ -68,7 +71,7 @@ export default function Extinction({ neglect, onDone }) {
       b = setTimeout(() => { setFlash(null); setAwaiting(true); }, FLASH_MS);
     }, gap);
     return () => { clearTimeout(a); clearTimeout(b); };
-  }, [i, trials, neglect]);
+  }, [i, trials]);
 
   function respond(answer) {
     if (!awaiting) return;
@@ -94,9 +97,9 @@ export default function Extinction({ neglect, onDone }) {
     <div className="ext">
       <div className="ext-count">{i + 1} / {trials.length}</div>
       <div className="ext-field">
-        <div className={"ext-dot left" + (flash?.left ? " on" : "")} />
+        <div className={"ext-dot weak" + (flash?.left ? " on" : "")} />
         <div className="ext-fix">+</div>
-        <div className={"ext-dot right" + (flash?.right ? " on" : "")} />
+        <div className={"ext-dot strong" + (flash?.right ? " on" : "")} />
       </div>
       {awaiting ? (
         <div className="ext-answer">

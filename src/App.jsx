@@ -157,7 +157,7 @@ export default function App() {
       )}
 
       {phase === "ext" && (
-        <Extinction neglect onDone={(rows) => { setExt(rows); setPhase("reveal"); }} />
+        <Extinction onDone={(rows) => { setExt(rows); setPhase("reveal"); }} />
       )}
 
       {phase === "reveal" && score && search && (
@@ -188,9 +188,10 @@ export default function App() {
           </p>
           <p className="small">
             This is <b>extinction</b>, and it is a standard bedside test for hemispatial
-            neglect after a right-hemisphere stroke. On the competing trials we removed the
-            left flash from your screen — because that is what a neglected brain does to it.
-            You could not tell the difference between removed and unattended. Neither can they.
+            neglect after a right-hemisphere stroke. Every left flash you just saw was
+            identical, and every one of them was really on your screen — including the ones
+            you missed. Nothing was removed. A brighter neighbour simply won, and the loser
+            never reached you. That is the whole condition, in one hundred milliseconds.
           </p>
           <button onClick={() => { setExt(null); setSearch(null); setPhase("intro"); }}>
             Run it again
