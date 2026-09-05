@@ -21,7 +21,6 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose }) {
 
   useEffect(() => {
     const el = gl.domElement;
-    const onClick = () => el.requestPointerLock?.();
     const onMove = (e) => {
       if (document.pointerLockElement !== el) return;
       yaw.current -= e.movementX * 0.0022;
@@ -35,12 +34,10 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose }) {
     const down = (e) => (keys.current[e.code] = true);
     const up = (e) => (keys.current[e.code] = false);
 
-    el.addEventListener("click", onClick);
     document.addEventListener("mousemove", onMove);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     return () => {
-      el.removeEventListener("click", onClick);
       document.removeEventListener("mousemove", onMove);
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);

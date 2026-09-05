@@ -58,3 +58,6 @@ th { color: #7a8898; font-weight: 500; font-size: 12px; text-transform: uppercas
 .verdict { font-size: 17px; color: #e6edf3 !important; line-height: 1.6; }
 .verdict b { color: #f0883e; }
 code { font-family: ui-monospace, monospace; background: #21262d; padding: 1px 6px; border-radius: 4px; font-size: .9em; }
+
+.overlay.grab { background: rgba(13,17,23,.55); cursor: pointer; }
+.overlay.grab h2 { font-size: 22px; }

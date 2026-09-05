@@ -15,7 +15,27 @@ export default function App() {
   const [phase, setPhase] = useState("intro");
   const [results, setResults] = useState([]);
   const [left, setLeft] = useState(RUN_SECONDS);
+  const [locked, setLocked] = useState(false);
+  const canvasRef = useRef(null);
   const guess = useRef(0);
+
+  // Browsers refuse a new pointer lock for about a second after one is
+  // released. Requesting it straight away fails silently, which left the
+  // second run unplayable while the clock kept running.
+  useEffect(() => {
+    const onChange = () => setLocked(!!document.pointerLockElement);
+    document.addEventListener("pointerlockchange", onChange);
+    return () => document.removeEventListener("pointerlockchange", onChange);
+  }, []);
+
+  function grabPointer() {
+    const el = canvasRef.current;
+    if (!el || document.pointerLockElement === el) return;
+    try {
+      const r = el.requestPointerLock?.();
+      if (r && r.catch) r.catch(() => setTimeout(() => el.requestPointerLock?.(), 400));
+    } catch { setTimeout(() => el.requestPointerLock?.(), 400); }
+  }
 
   useEffect(() => {
     fetch("/scene.json").then((r) => r.json()).then(setScene);
@@ -40,7 +60,7 @@ export default function App() {
   // early because the room feels finished; a healthy participant with
   // unlimited time will simply grind until they have everything.
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || !locked) return;   // the clock waits for control
     const id = setInterval(() => {
       setLeft((s) => {
         if (s <= 1) { clearInterval(id); declare(); return 0; }
@@ -48,7 +68,7 @@ export default function App() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [phase]);
+  }, [phase, locked]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -90,7 +110,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <Canvas camera={{ fov: 72, near: 0.1, far: 200 }}>
+      <Canvas
+        camera={{ fov: 72, near: 0.1, far: 200 }}
+        onCreated={({ gl }) => (canvasRef.current = gl.domElement)}
+      >
         {scene && (
           <>
             <FirstPerson spawn={scene.spawn} onPose={(p) => setPoses((x) => [...x, p])} />
@@ -99,7 +122,14 @@ export default function App() {
         )}
       </Canvas>
 
-      {phase === "playing" && (
+      {phase === "playing" && !locked && (
+        <div className="overlay grab" onClick={grabPointer}>
+          <h2>Click to look around</h2>
+          <p>The timer is paused until you do.</p>
+        </div>
+      )}
+
+      {phase === "playing" && locked && (
         <>
           <div className="crosshair" />
           <div className="hud">
@@ -119,7 +149,9 @@ export default function App() {
             There are objects hidden around this room. You have {RUN_SECONDS} seconds
             to find as many as you can. Click to look around, WASD to walk.
           </p>
-          <button onClick={startRun}>{runIndex === 0 ? "Start" : "Once more, new room"}</button>
+          <button onClick={() => { startRun(); setTimeout(grabPointer, 450); }}>
+            {runIndex === 0 ? "Start" : "Once more, new room"}
+          </button>
         </div>
       )}
 
