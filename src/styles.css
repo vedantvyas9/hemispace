@@ -61,3 +61,32 @@ code { font-family: ui-monospace, monospace; background: #21262d; padding: 1px 6
 
 .overlay.grab { background: rgba(13,17,23,.55); cursor: pointer; }
 .overlay.grab h2 { font-size: 22px; }
+
+/* ---- extinction ---- */
+.ext { position: fixed; inset: 0; background: #0d1117; display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 40px; }
+.ext-count { position: fixed; top: 20px; right: 24px; font-size: 13px; color: #7a8898;
+  font-variant-numeric: tabular-nums; }
+.ext-field { position: relative; width: min(880px, 88vw); height: 200px;
+  display: flex; align-items: center; justify-content: space-between; }
+.ext-fix { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  font-size: 34px; color: #8b98a5; }
+.ext-dot { width: 62px; height: 62px; border-radius: 50%; background: transparent;
+  transition: none; }
+.ext-dot.on { background: #f5f7fa; box-shadow: 0 0 26px rgba(245,247,250,.55); }
+.ext-hold { color: #7a8898; font-size: 14px; }
+.ext-answer { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.ext-answer p { color: #a3b1c0; margin: 0; }
+.ext-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.ext-buttons button { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; font-size: 14px; }
+.ext-buttons button.ghost { background: #21262d; }
+.ext-buttons kbd { background: rgba(0,0,0,.28); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+
+/* ---- reveal bars ---- */
+.bars { display: flex; flex-direction: column; gap: 12px; width: min(640px, 90vw); }
+.bar-row { display: grid; grid-template-columns: 1fr 200px 46px; gap: 14px; align-items: center; }
+.bar-label { font-size: 14px; color: #a3b1c0; text-align: right; }
+.bar { height: 22px; background: #1b242e; border-radius: 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 6px; transition: width .8s ease; }
+.bar-val { font-size: 15px; font-variant-numeric: tabular-nums; text-align: left; }
+@media (max-width: 620px) { .bar-row { grid-template-columns: 1fr; } .bar-label { text-align: left; } }

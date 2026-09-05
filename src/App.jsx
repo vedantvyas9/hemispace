@@ -2,26 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import FirstPerson from "./FirstPerson";
 import Scene from "./Scene";
+import Extinction, { scoreExtinction } from "./Extinction";
 import { DEFAULTS, meanGazeDeg, leftDwellFraction } from "./neglect";
 
-const RUNS = ["clean", "neglect"];
-const RUN_SECONDS = 25;
+const SEARCH_SECONDS = 25;
+const CLEAN = { ...DEFAULTS, enabled: false };
 
 export default function App() {
   const [scene, setScene] = useState(null);
-  const [runIndex, setRunIndex] = useState(0);
+  const [phase, setPhase] = useState("intro");  // intro | search | declare | extIntro | ext | reveal
   const [found, setFound] = useState(new Set());
   const [poses, setPoses] = useState([]);
-  const [phase, setPhase] = useState("intro");
-  const [results, setResults] = useState([]);
-  const [left, setLeft] = useState(RUN_SECONDS);
+  const [left, setLeft] = useState(SEARCH_SECONDS);
   const [locked, setLocked] = useState(false);
+  const [search, setSearch] = useState(null);
+  const [ext, setExt] = useState(null);
   const canvasRef = useRef(null);
   const guess = useRef(0);
 
-  // Browsers refuse a new pointer lock for about a second after one is
-  // released. Requesting it straight away fails silently, which left the
-  // second run unplayable while the clock kept running.
+  useEffect(() => { fetch("/scene.json").then((r) => r.json()).then(setScene); }, []);
+
   useEffect(() => {
     const onChange = () => setLocked(!!document.pointerLockElement);
     document.addEventListener("pointerlockchange", onChange);
@@ -37,76 +37,43 @@ export default function App() {
     } catch { setTimeout(() => el.requestPointerLock?.(), 400); }
   }
 
+  useEffect(() => { if (phase !== "search") document.exitPointerLock?.(); }, [phase]);
+
   useEffect(() => {
-    fetch("/scene.json").then((r) => r.json()).then(setScene);
-  }, []);
-
-  const run = RUNS[runIndex];
-  const neglect = { ...DEFAULTS, enabled: run === "neglect" };
-
-  function startRun() {
-    setFound(new Set());
-    setPoses([]);
-    setLeft(RUN_SECONDS);
-    setPhase("playing");
-  }
-
-  function declare() {
-    document.exitPointerLock?.();
-    setPhase("declare");
-  }
-
-  // The clock is what makes this a search, not an audit. Real patients stop
-  // early because the room feels finished; a healthy participant with
-  // unlimited time will simply grind until they have everything.
-  useEffect(() => {
-    if (phase !== "playing" || !locked) return;   // the clock waits for control
+    if (phase !== "search" || !locked) return;
     const id = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1) { clearInterval(id); declare(); return 0; }
-        return s - 1;
-      });
+      setLeft((s) => { if (s <= 1) { clearInterval(id); endSearch(); return 0; } return s - 1; });
     }, 1000);
     return () => clearInterval(id);
   }, [phase, locked]);
 
   useEffect(() => {
     const onKey = (e) => {
-      if (phase === "playing" && (e.code === "Enter" || e.code === "NumpadEnter")) {
-        e.preventDefault();
-        declare();
+      if (phase === "search" && (e.code === "Enter" || e.code === "NumpadEnter")) {
+        e.preventDefault(); endSearch();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [phase]);
 
-  useEffect(() => {
-    if (phase !== "playing") document.exitPointerLock?.();
-  }, [phase]);
-
   useEffect(() => { guess.current = found.size; }, [found]);
 
-  function handleFind(id) {
-    setFound((prev) => { const n = new Set(prev); n.add(id); return n; });
-  }
+  function startSearch() { setFound(new Set()); setPoses([]); setLeft(SEARCH_SECONDS); setPhase("search"); }
+  function endSearch() { document.exitPointerLock?.(); setPhase("declare"); }
 
-  function finish() {
-    const missed = scene.targets.filter((t) => !found.has(t.id)).map((t) => t.id);
-    setResults((r) => [...r, {
-      run,
+  function submitSearch() {
+    setSearch({
       found: found.size,
       total: scene.targets.length,
-      missed,
+      said: Number(guess.current),
       gaze: meanGazeDeg(poses),
       leftPct: leftDwellFraction(poses) * 100,
-      said: Number(guess.current),
-    }]);
-    if (runIndex === 0) { setRunIndex(1); setPhase("intro"); }
-    else setPhase("reveal");
+    });
+    setPhase("extIntro");
   }
 
-  const clean = results[0], neg = results[1];
+  const score = ext ? scoreExtinction(ext) : null;
 
   return (
     <div className="app">
@@ -118,26 +85,27 @@ export default function App() {
           <>
             <FirstPerson
               spawn={scene.spawn}
-              neglect={neglect}
+              neglect={CLEAN}
               onPose={(p) => setPoses((x) => [...x, p])}
             />
-            <Scene scene={scene} neglect={neglect} found={found} onFind={handleFind} />
+            <Scene scene={scene} neglect={CLEAN} found={found} onFind={(id) =>
+              setFound((prev) => { const n = new Set(prev); n.add(id); return n; })} />
           </>
         )}
       </Canvas>
 
-      {phase === "playing" && !locked && (
+      {phase === "search" && !locked && (
         <div className="overlay grab" onClick={grabPointer}>
           <h2>Click to look around</h2>
           <p>The timer is paused until you do.</p>
         </div>
       )}
 
-      {phase === "playing" && locked && (
+      {phase === "search" && locked && (
         <>
           <div className="crosshair" />
           <div className="hud">
-            <span className={left <= 10 ? "urgent" : ""}>{left}s</span>
+            <span className={left <= 8 ? "urgent" : ""}>{left}s</span>
             <span className="sep" />
             <span>Found {found.size}</span>
             <kbd>Enter</kbd>
@@ -150,63 +118,79 @@ export default function App() {
         <div className="overlay">
           <h1>Hemispace</h1>
           <p>
-            There are objects hidden around this room. You have {RUN_SECONDS} seconds
-            to find as many as you can. Click to look around, WASD to walk.
+            First, a warm-up. There are objects all around this room — behind you too.
+            You have {SEARCH_SECONDS} seconds to find as many as you can.
           </p>
-          <button onClick={() => { startRun(); setTimeout(grabPointer, 450); }}>
-            {runIndex === 0 ? "Start" : "Once more, new room"}
-          </button>
+          <button onClick={() => { startSearch(); setTimeout(grabPointer, 450); }}>Start</button>
         </div>
       )}
 
       {phase === "declare" && (
         <div className="overlay">
           <h2>How many were in the room?</h2>
-          <p>Your best guess — not how many you found.</p>
           <input
-            type="number"
-            defaultValue={found.size}
+            type="number" defaultValue={found.size}
             onChange={(e) => (guess.current = e.target.value)}
-            onKeyDown={(e) => e.code === "Enter" && finish()}
+            onKeyDown={(e) => e.code === "Enter" && submitSearch()}
             autoFocus
           />
-          <button onClick={finish}>That's my answer</button>
+          <button onClick={submitSearch}>Continue</button>
         </div>
       )}
 
-      {phase === "reveal" && clean && neg && (
+      {phase === "extIntro" && search && (
+        <div className="overlay">
+          <h2>You found {search.found} of {search.total}</h2>
+          <p>
+            Your eyes work, and this room holds no secrets from you. Hold on to that,
+            because the next part takes twenty seconds.
+          </p>
+          <p>
+            Keep your eyes on the cross in the middle. Dots will flash at the edges —
+            on the left, on the right, or on both sides at once. After each flash,
+            say where you saw it.
+          </p>
+          <button onClick={() => setPhase("ext")}>I'm ready</button>
+        </div>
+      )}
+
+      {phase === "ext" && (
+        <Extinction neglect onDone={(rows) => { setExt(rows); setPhase("reveal"); }} />
+      )}
+
+      {phase === "reveal" && score && search && (
         <div className="overlay wide">
-          <h2>What got through</h2>
-          <table>
-            <thead>
-              <tr><th>Run</th><th>Found</th><th>You said</th><th>Mean gaze</th><th>Time facing left</th></tr>
-            </thead>
-            <tbody>
-              {results.map((r, i) => (
-                <tr key={i} className={r.run === "neglect" ? "row-neg" : ""}>
-                  <td>{r.run === "clean" ? "First room" : "Second room"}</td>
-                  <td>{r.found} / {r.total}</td>
-                  <td>{r.said || "—"}</td>
-                  <td>{r.gaze.toFixed(1)}°</td>
-                  <td>{r.leftPct.toFixed(0)}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h2>Your eyes are fine</h2>
+          <div className="bars">
+            <div className="bar-row">
+              <span className="bar-label">Left flash, on its own</span>
+              <div className="bar"><i style={{ width: score.leftAlone + "%", background: "#4ea87a" }} /></div>
+              <span className="bar-val">{score.leftAlone}%</span>
+            </div>
+            <div className="bar-row">
+              <span className="bar-label">Left flash, with something on the right</span>
+              <div className="bar"><i style={{ width: score.leftCompeting + "%", background: "#f0883e" }} /></div>
+              <span className="bar-val">{score.leftCompeting}%</span>
+            </div>
+            <div className="bar-row">
+              <span className="bar-label">Right flash, on its own</span>
+              <div className="bar"><i style={{ width: score.rightAlone + "%", background: "#4ea87a" }} /></div>
+              <span className="bar-val">{score.rightAlone}%</span>
+            </div>
+          </div>
 
           <p className="verdict">
-            {neg.found < clean.found ? (
-              <>You missed <b>{clean.found - neg.found}</b> in the second room, and told us
-              there were <b>{neg.said}</b>. Nothing was hidden and nothing was dark.
-              Your attention simply stopped going left.</>
-            ) : (
-              <>You found them all — but you spent <b>{clean.leftPct.toFixed(0)}%</b> of the
-              first room facing left and only <b>{neg.leftPct.toFixed(0)}%</b> of the second.
-              Nobody asked you to look left less. You just did.</>
-            )}
+            You caught <b>{score.leftAlone}%</b> of left-side flashes when they appeared alone,
+            and <b>{score.leftCompeting}%</b> when something appeared on the right at the same
+            moment. Same eye. Same spot on the screen. Same brightness.
           </p>
-          <p className="small">You saw all of it. This is what registered.</p>
-          <button onClick={() => { setResults([]); setRunIndex(0); setPhase("intro"); }}>
+          <p className="small">
+            This is <b>extinction</b>, and it is a standard bedside test for hemispatial
+            neglect after a right-hemisphere stroke. On the competing trials we removed the
+            left flash from your screen — because that is what a neglected brain does to it.
+            You could not tell the difference between removed and unattended. Neither can they.
+          </p>
+          <button onClick={() => { setExt(null); setSearch(null); setPhase("intro"); }}>
             Run it again
           </button>
         </div>
