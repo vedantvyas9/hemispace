@@ -1,23 +1,22 @@
 {
   "world": {
-    "splatUrl": "https://cdn.mint.gg/rad/vision-study-testing-room-f0f5b39cacc0b044-lod.rad",
-    "colliderUrl": "https://cdn.mint.gg/worlds/vision-study-testing-room-collider-7c0767187b229029.glb"
+    "splatUrl": "https://cdn.mint.gg/rad/modern-open-plan-living-room-20896bfb2ccbde97-lod.rad",
+    "colliderUrl": "https://cdn.mint.gg/worlds/modern-open-plan-living-room-collider-a591588a0667bd21.glb",
+    "transform": {
+      "position": [-1.15, 1.19, -3.76],
+      "rotation": [3.14159, 3.14159, 0],
+      "scale": 0.5
+    }
   },
   "spawn": { "position": [0, 1.6, 0], "yaw": 0 },
+
   "targets": [
-    { "id": "L1", "url": "/assets/mint/t1/original_glb.glb", "position": [-2.05, 0.85, -1.30], "scale": 0.16 },
-    { "id": "L2", "url": "/assets/mint/t3/original_glb.glb", "position": [-1.85, 1.05, -3.40], "scale": 0.18 },
-    { "id": "L3", "url": "/assets/mint/t2/original_glb.glb", "position": [-1.55, 0.80, -6.10], "scale": 0.16 },
-    { "id": "L4", "url": "/assets/mint/t6/original_glb.glb", "position": [-1.20, 0.95, -9.20], "scale": 0.16 },
-    { "id": "L5", "url": "/assets/mint/t5/original_glb.glb", "position": [-2.15, 1.00,  0.90], "scale": 0.35 },
-    { "id": "L6", "url": "/assets/mint/t4/original_glb.glb", "position": [-1.90, 0.85,  3.20], "scale": 0.28 },
-    { "id": "L7", "url": "/assets/mint/t1/original_glb.glb", "position": [-1.30, 1.00,  5.60], "scale": 0.16 },
-    { "id": "R1", "url": "/assets/mint/t4/original_glb.glb", "position": [ 2.05, 0.85, -1.30], "scale": 0.28 },
-    { "id": "R2", "url": "/assets/mint/t5/original_glb.glb", "position": [ 1.85, 1.05, -3.40], "scale": 0.35 },
-    { "id": "R3", "url": "/assets/mint/t6/original_glb.glb", "position": [ 1.55, 0.80, -6.10], "scale": 0.16 },
-    { "id": "R4", "url": "/assets/mint/t2/original_glb.glb", "position": [ 1.20, 0.95, -9.20], "scale": 0.16 },
-    { "id": "R5", "url": "/assets/mint/t3/original_glb.glb", "position": [ 2.15, 1.00,  0.90], "scale": 0.18 },
-    { "id": "R6", "url": "/assets/mint/t1/original_glb.glb", "position": [ 1.90, 0.85,  3.20], "scale": 0.16 },
-    { "id": "R7", "url": "/assets/mint/t5/original_glb.glb", "position": [ 1.30, 1.00,  5.60], "scale": 0.35 }
+    { "id": "R1", "url": "/assets/mint/t6/original_glb.glb", "position": [ 1.21, 0.08, -2.47], "scale": 0.16, "azimuthDeg": 26 },
+    { "id": "R2", "url": "/assets/mint/t1/original_glb.glb", "position": [ 1.64, 0.62, -0.60], "scale": 0.16, "azimuthDeg": 70 },
+    { "id": "R3", "url": "/assets/mint/t2/original_glb.glb", "position": [ 1.39, 0.97,  0.56], "scale": 0.16, "azimuthDeg": 112 },
+    { "id": "R4", "url": "/assets/mint/t4/original_glb.glb", "position": [ 0.70, 0.95,  1.32], "scale": 0.28, "azimuthDeg": 152 },
+
+    { "id": "L1", "url": "/assets/mint/t5/original_glb.glb", "position": [-3.76, 0.59,  1.37], "scale": 0.35, "azimuthDeg": -110 },
+    { "id": "L2", "url": "/assets/mint/t3/original_glb.glb", "position": [-2.83, 0.86,  2.83], "scale": 0.18, "azimuthDeg": -135 }
   ]
 }

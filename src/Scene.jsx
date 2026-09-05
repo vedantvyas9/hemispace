@@ -1,4 +1,4 @@
-import { useMemo, useRef, Suspense } from "react";
+import { useCallback, useMemo, useRef, useState, Suspense } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { dwellMs } from "./neglect";
@@ -11,6 +11,34 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false, di
   const centre = useMemo(() => new THREE.Vector2(0, 0), []);
   const groupRef = useRef();
   const gridRef = useRef();
+  const [restY, setRestY] = useState({});
+
+  /**
+   * Drop every object onto whatever is actually underneath it.
+   *
+   * The generated room has furniture, worktops and shelves, and none of that is
+   * known when the positions are authored — a fixed height leaves things
+   * hanging in mid-air over a sofa or sunk into a table. So each object is
+   * raycast straight down onto the collider and comes to rest on the first real
+   * surface it meets, whatever that happens to be.
+   */
+  const dropOntoSurfaces = useCallback((collider) => {
+    if (!collider || !scene) return;
+    collider.updateWorldMatrix(true, true);
+    const down = new THREE.Raycaster();
+    const dir = new THREE.Vector3(0, -1, 0);
+    const out = {};
+    for (const t of scene.targets) {
+      const from = new THREE.Vector3(t.position[0], 2.6, t.position[2]);
+      down.set(from, dir);
+      down.far = 5;
+      const hit = down.intersectObject(collider, true)[0];
+      if (hit) out[t.id] = hit.point.y + (t.restOffset ?? 0.02);
+    }
+    setRestY(out);
+    const missed = scene.targets.length - Object.keys(out).length;
+    if (missed) console.warn(`[hemispace] ${missed} object(s) found no surface below them`);
+  }, [scene]);
 
   useFrame((_, dt) => {
     if (gridRef.current)
@@ -37,7 +65,7 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false, di
 
       <Suspense fallback={null}>
         {hasWorld
-          ? <MintWorld world={scene.world} dissolve={dissolve} />
+          ? <MintWorld world={scene.world} dissolve={dissolve} onColliderReady={dropOntoSurfaces} />
           : <GreyRoom dissolve={dissolve} />}
       </Suspense>
 
@@ -51,7 +79,9 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false, di
           {scene.targets.map((t) => (
             <Target
               key={t.id}
-              target={t}
+              target={restY[t.id] !== undefined
+                ? { ...t, position: [t.position[0], restY[t.id], t.position[2]] }
+                : t}
               state={found.has(t.id) ? "found" : hidden.has(t.id) ? "unseen" : "missed"}
               reveal={reveal}
             />

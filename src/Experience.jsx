@@ -93,7 +93,10 @@ export default function Experience({ onExit }) {
     <div className="app">
       <Canvas
         camera={{ fov: 72, near: 0.1, far: 300 }}
-        onCreated={({ gl }) => (canvasRef.current = gl.domElement)}
+        onCreated={({ gl, scene, camera }) => {
+          canvasRef.current = gl.domElement;
+          window.__hemi = { gl, scene, camera };
+        }}
       >
         {scene && (
           <>

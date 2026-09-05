@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { Component, Suspense, useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -7,12 +7,14 @@ import { SparkRenderer, SplatFileType, SplatMesh } from "@sparkjsdev/spark";
 // Mint GLBs may use KHR_draco_mesh_compression; one shared decoder for every load.
 useGLTF.setDecoderPath("https://cdn.mint.gg/runtime/draco/gltf/three-0.184.0/");
 
-// Corrects the World Labs source basis, and a per-asset scale rather than the
-// pipeline default — the raw collider is roughly 3.2 x 1.6 x 19m, so the
-// documented 2.5x blew it out into a 48m cavern.
-const WORLD_POSITION = [0, 1.5, 0];
-const WORLD_ROTATION = [Math.PI, Math.PI, 0];
-const WORLD_SCALE = 1.6;
+// Every generated world arrives in its own basis and its own units, so the
+// transform is data, not code — it lives in scene.json next to the URLs and is
+// tuned by looking at the room rather than by editing a component.
+const DEFAULT_TRANSFORM = {
+  position: [0, 0, 0],
+  rotation: [Math.PI, Math.PI, 0],
+  scale: 1,
+};
 
 /**
  * The generated room: a RAD splat for what you see, an invisible collider for
@@ -23,7 +25,7 @@ const WORLD_SCALE = 1.6;
  * a Marble world is captured around eye height and falls apart when viewed
  * from far outside that volume, so the camera never sees it from above.
  */
-export function MintWorld({ world, dissolve }) {
+export function MintWorld({ world, dissolve, onColliderReady }) {
   const { gl } = useThree();
   const spark = useMemo(() => new SparkRenderer({ renderer: gl }), [gl]);
   const splat = useMemo(
@@ -33,7 +35,10 @@ export function MintWorld({ world, dissolve }) {
   const { scene: colliderScene } = useGLTF(world.colliderUrl);
   const opacity = useRef(1);
 
-  useEffect(() => { colliderScene.traverse((o) => { o.visible = false; }); }, [colliderScene]);
+  useEffect(() => {
+    colliderScene.traverse((o) => { o.visible = false; });
+    onColliderReady?.(colliderScene);
+  }, [colliderScene, onColliderReady]);
   useEffect(() => () => { spark.dispose?.(); splat.dispose?.(); }, [spark, splat]);
 
   useFrame((_, dt) => {
@@ -45,10 +50,12 @@ export function MintWorld({ world, dissolve }) {
     }
   });
 
+  const t = { ...DEFAULT_TRANSFORM, ...(world.transform ?? {}) };
+
   return (
     <>
       <primitive object={spark} />
-      <group position={WORLD_POSITION} rotation={WORLD_ROTATION} scale={WORLD_SCALE}>
+      <group position={t.position} rotation={t.rotation} scale={t.scale}>
         <primitive object={splat} />
         <primitive object={colliderScene} />
       </group>
@@ -162,12 +169,34 @@ function Box({ target, state, reveal }) {
   );
 }
 
+/**
+ * A model that has not been downloaded yet, or that fails to parse, must never
+ * take the scene down with it. Anything that goes wrong falls back to the
+ * placeholder box, so the demo always has something findable in that spot.
+ */
+class ModelBoundary extends Component {
+  constructor(p) { super(p); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err) {
+    if (!ModelBoundary.warned?.has(this.props.url)) {
+      (ModelBoundary.warned ??= new Set()).add(this.props.url);
+      console.warn("[hemispace] falling back to a box for", this.props.url, err?.message ?? err);
+    }
+  }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
 export function Target({ target, state, reveal }) {
+  const box = <Box target={target} state={state} reveal={reveal} />;
   return (
     <group position={target.position} userData={{ id: target.id }}>
-      {target.url
-        ? <Model target={target} state={state} reveal={reveal} />
-        : <Box target={target} state={state} reveal={reveal} />}
+      {target.url ? (
+        <ModelBoundary url={target.url} fallback={box}>
+          <Suspense fallback={box}>
+            <Model target={target} state={state} reveal={reveal} />
+          </Suspense>
+        </ModelBoundary>
+      ) : box}
     </group>
   );
 }
