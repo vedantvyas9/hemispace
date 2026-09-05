@@ -1,18 +1,24 @@
 import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { lookGain, pullRad, limitGain } from "./neglect";
 
 /**
  * Pointer-lock first person controller.
  * The camera's forward direction IS the body midline for the neglect model,
  * so this has to feel right before anything else gets built on top of it.
  */
-export default function FirstPerson({ spawn, speed = 3.2, onPose }) {
+export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect, yawLimits = null }) {
   const { camera, gl } = useThree();
   const keys = useRef({});
   const yaw = useRef(spawn?.yaw ?? 0);
   const pitch = useRef(0);
   const lastEmit = useRef(0);
+  const neglectRef = useRef(neglect);
+  neglectRef.current = neglect;
+  const limitsRef = useRef(yawLimits);
+  limitsRef.current = yawLimits;
+  const lastMove = useRef(0);
 
   useEffect(() => {
     const p = spawn?.position ?? [0, 1.6, 0];
@@ -21,22 +27,26 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose }) {
 
   useEffect(() => {
     const el = gl.domElement;
-    const onClick = () => el.requestPointerLock?.();
     const onMove = (e) => {
       if (document.pointerLockElement !== el) return;
-      yaw.current -= e.movementX * 0.0022;
+      const g = lookGain(e.movementX, neglectRef.current)
+             * limitGain(yaw.current, e.movementX, limitsRef.current);
+      yaw.current -= e.movementX * 0.0022 * g;
+      lastMove.current = performance.now();
+      // Wrap to [-PI, PI]. Without this the metric drifts to nonsense
+      // as soon as someone spins more than once.
+      if (yaw.current > Math.PI) yaw.current -= 2 * Math.PI;
+      if (yaw.current < -Math.PI) yaw.current += 2 * Math.PI;
       pitch.current -= e.movementY * 0.0022;
       pitch.current = Math.max(-1.2, Math.min(1.2, pitch.current));
     };
     const down = (e) => (keys.current[e.code] = true);
     const up = (e) => (keys.current[e.code] = false);
 
-    el.addEventListener("click", onClick);
     document.addEventListener("mousemove", onMove);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     return () => {
-      el.removeEventListener("click", onClick);
       document.removeEventListener("mousemove", onMove);
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
@@ -44,6 +54,12 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose }) {
   }, [gl]);
 
   useFrame((state, dt) => {
+    // The pull only shows itself when the participant is not actively turning.
+    const idle = performance.now() - lastMove.current > 220;
+    yaw.current += pullRad(yaw.current, dt, idle, neglectRef.current);
+    if (yaw.current > Math.PI) yaw.current -= 2 * Math.PI;
+    if (yaw.current < -Math.PI) yaw.current += 2 * Math.PI;
+
     const e = new THREE.Euler(pitch.current, yaw.current, 0, "YXZ");
     camera.quaternion.setFromEuler(e);
 

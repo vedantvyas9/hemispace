@@ -2,12 +2,4 @@ node_modules
 dist
 .env.local
 .vercel
-
-# Raw Mint web-app exports — already synced into public/assets/mint via mint-assets.json;
-# the room's RAD file is streamed from Mint's CDN, not needed locally at all.
-/assets/
-.gstack/
-AGENTS.md
-CLAUDE.md
-.agents/
-.claude/
+.DS_Store

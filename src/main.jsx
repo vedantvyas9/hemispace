@@ -16,8 +16,10 @@ function Root() {
   return showResults ? <Results /> : <App />;
 }
 
-createRoot(document.getElementById("root")).render(
-  <ConvexProvider client={convex}>
-    <Root />
-  </ConvexProvider>,
+// The spectator view needs Convex; the experience itself does not. Without a
+// deployment URL the app still runs, so a missing env var can never be the
+// thing that breaks a demo.
+const root = createRoot(document.getElementById("root"));
+root.render(
+  convex ? <ConvexProvider client={convex}><Root /></ConvexProvider> : <App />
 );

@@ -26,11 +26,16 @@ const _r = new THREE.Vector3();
 
 export const DEFAULTS = {
   enabled: false,
-  midlineShift: 12,   // deg. Where attention has already halved. Severity knob.
-  spread: 20,         // deg. How abruptly it falls away. Smaller = sharper.
+  midlineShift: 18,   // deg. Where attention has already halved. Severity knob.
+  spread: 16,         // deg. How abruptly it falls away. Smaller = sharper.
   rightBoost: 0.12,   // Over-allocation to the ipsilesional side.
   floor: 0.04,        // Never exactly zero — the input is not actually gone.
   allocentric: 0,     // 0 = purely egocentric, 1 = purely object-centred.
+  rightGain: 1.34,      // Turning toward the good side covers more ground.
+  equilibriumDeg: 30,   // Where attention comes to rest, right of body midline.
+  pullStiffness: 0.7,   // How insistently it returns there.
+  maxPullDegPerSec: 13, // Ceiling, so it never feels like a stuck control.
+  activePullScale: 0.5, // The pull does not switch off while you are turning.
 };
 
 /**
@@ -110,9 +115,94 @@ export function extinguished(candidates, camera, opts = {}) {
   return out;
 }
 
-/** Dwell time before an object registers. Cheap on the right, costly on the left. */
-export function dwellMs(weight, base = 220, max = 2600) {
-  return Math.min(max, base / Math.max(weight, 0.02));
+/**
+ * Dwell before an object registers.
+ *
+ * Kept deliberately small and nearly flat across the field. An earlier version
+ * made left-side objects expensive to register, and it produced the wrong
+ * subjective experience entirely: participants reported seeing an object,
+ * aiming at it, and having it refuse to respond. That is a broken interface,
+ * not neglect. A real patient who does orient to a left-side object perceives
+ * it normally — the deficit is that they never orient there.
+ *
+ * So misses must come from not looking, never from looking and failing.
+ * The lever that produces them is lookGain() below.
+ *
+ * Second playtest still reported a lag on the left, so this is now flat:
+ * identical everywhere, no attention term at all. Any perceptible difference
+ * in responsiveness reads as a bug and costs more than it buys.
+ */
+export function dwellMs() {
+  return 150;   // flat, everywhere, always
+}
+
+/**
+ * THE PULL.
+ *
+ * An earlier version damped leftward turning, on the reasoning that patients
+ * are slower to move toward the neglected side. It backfired, and the metrics
+ * caught it: participants fought the control, overshot, and ended up spending
+ * MORE time facing left than in the clean run — the exact opposite of the
+ * clinical signature. Damping reduces the ability to turn, and a healthy
+ * person simply pushes harder.
+ *
+ * What is actually reduced in neglect is the pull, not the power. Kinsbourne's
+ * model: both hemispheres push attention contralaterally and normally cancel
+ * out; lose the right one and the left hemisphere's rightward drive is
+ * unopposed. So: no resistance anywhere, a gentle constant drift toward the
+ * good side, and slightly more ground covered when turning that way.
+ *
+ * Nothing to fight, so nothing to notice.
+ */
+export function lookGain(movementX, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  if (!o.enabled) return 1;
+  return movementX > 0 ? o.rightGain : 1;   // movementX > 0 turns the view right
+}
+
+/**
+ * The pull, as a displaced equilibrium rather than a constant drift.
+ *
+ * Attention has a resting position. In neglect that position sits well to the
+ * right of the body midline, so the further left you are, the harder it pulls
+ * you back — and once you are on the good side it does nothing at all. A flat
+ * drift could not do this: it pushed just as hard when the participant was
+ * already looking right, which is not what the model says and wasted its
+ * effect where it was not needed.
+ *
+ * Applied at full strength while still and at half strength while turning.
+ * An earlier version switched it off entirely during movement, which meant
+ * that across an active 25-second search — where the mouse is almost always
+ * moving — it barely applied at all. A displaced equilibrium does not pause
+ * because you happen to be looking around.
+ *
+ * @param yaw current yaw in radians (positive = facing left)
+ */
+export function pullRad(yaw, dt, idle, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  if (!o.enabled) return 0;
+  const scale = idle ? 1 : o.activePullScale;
+  const equilibrium = -(o.equilibriumDeg * Math.PI) / 180;   // negative = right
+  const err = yaw - equilibrium;                              // >0 means left of rest
+  const max = (o.maxPullDegPerSec * Math.PI) / 180;
+  const rate = Math.max(-max, Math.min(max, err * o.pullStiffness)) * scale;
+  return -rate * dt;
+}
+
+/**
+ * Fraction of the run spent facing left of the body midline. More robust than
+ * the mean when someone spins, and immediately legible to a non-specialist:
+ * "you spent 11% of your time looking at half the room."
+ */
+export function leftDwellFraction(poses) {
+  if (poses.length < 2) return 0;
+  let left = 0, total = 0;
+  for (let i = 1; i < poses.length; i++) {
+    const dt = Math.max(0, poses[i].t - poses[i - 1].t);
+    total += dt;
+    if (poses[i].yaw < 0) left += dt;
+  }
+  return total > 0 ? left / total : 0;
 }
 
 /**
@@ -132,4 +222,34 @@ export function meanGazeDeg(poses) {
     den += dt;
   }
   return den > 0 ? num / den : poses[poses.length - 1].yaw;
+}
+
+/**
+ * A soft ceiling on how far the head can turn.
+ *
+ * This is a stage decision, not a clinical one, and it should be described as
+ * such: a real patient can turn their head anywhere they like, they simply do
+ * not think to. But in a live demo an anxious volunteer will sweep the full
+ * circle, show the audience the empty left half, and spend the reveal before
+ * it has been set up.
+ *
+ * So round two allows a full turn to the right — the objects behind on that
+ * side still have to be findable — and gets progressively heavier toward the
+ * left, easing to a stop rather than hitting a wall. Nothing snaps back and
+ * nothing locks, so it reads as the head simply not wanting to go further.
+ */
+export const YAW_LIMITS = { maxLeftDeg: 38, maxRightDeg: 170, bandDeg: 22 };
+
+/** Multiplier for a turn, 1 in open space and easing to near zero at a limit. */
+export function limitGain(yaw, movementX, limits) {
+  if (!limits) return 1;
+  const { maxLeftDeg, maxRightDeg, bandDeg } = limits;
+  const deg = (yaw * 180) / Math.PI;          // positive = facing left
+  const turningLeft = movementX < 0;
+  const edge = turningLeft ? maxLeftDeg : -maxRightDeg;
+  const dist = turningLeft ? edge - deg : deg - edge;
+  if (dist >= bandDeg) return 1;
+  if (dist <= 0) return 0.02;
+  const t = dist / bandDeg;
+  return 0.02 + 0.98 * (t * t * (3 - 2 * t));   // smoothstep
 }
