@@ -95,3 +95,17 @@ code { font-family: ui-monospace, monospace; background: #21262d; padding: 1px 6
 .bar i { display: block; height: 100%; border-radius: 6px; transition: width .8s ease; }
 .bar-val { font-size: 15px; font-variant-numeric: tabular-nums; text-align: left; }
 @media (max-width: 620px) { .bar-row { grid-template-columns: 1fr; } .bar-label { text-align: left; } }
+
+/* ---- staged 3D reveal ---- */
+.reveal-ui { position: fixed; inset: 0; pointer-events: none;
+  display: flex; align-items: flex-end; justify-content: center; padding: 0 24px 56px; }
+.cap { pointer-events: auto; text-align: center; max-width: 60ch;
+  background: linear-gradient(to top, rgba(13,17,23,.94), rgba(13,17,23,.78));
+  border: 1px solid #25303b; border-radius: 16px; padding: 24px 30px;
+  animation: rise .5s ease both; }
+.cap h2 { font-size: clamp(20px, 3.4vw, 30px); margin: 0 0 10px; }
+.cap p { color: #a3b1c0; margin: 0 0 8px; line-height: 1.6; }
+.cap .small { font-size: 13.5px; color: #7a8898; }
+.cap button { margin-top: 14px; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cap { animation: none; } }
