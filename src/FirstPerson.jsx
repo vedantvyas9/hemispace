@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { lookGain } from "./neglect";
+import { lookGain, driftRad } from "./neglect";
 
 /**
  * Pointer-lock first person controller.
@@ -16,6 +16,7 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect }) {
   const lastEmit = useRef(0);
   const neglectRef = useRef(neglect);
   neglectRef.current = neglect;
+  const lastMove = useRef(0);
 
   useEffect(() => {
     const p = spawn?.position ?? [0, 1.6, 0];
@@ -27,6 +28,7 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect }) {
     const onMove = (e) => {
       if (document.pointerLockElement !== el) return;
       yaw.current -= e.movementX * 0.0022 * lookGain(e.movementX, neglectRef.current);
+      lastMove.current = performance.now();
       // Wrap to [-PI, PI]. Without this the metric drifts to nonsense
       // as soon as someone spins more than once.
       if (yaw.current > Math.PI) yaw.current -= 2 * Math.PI;
@@ -48,6 +50,12 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect }) {
   }, [gl]);
 
   useFrame((state, dt) => {
+    // The pull only shows itself when the participant is not actively turning.
+    const idle = performance.now() - lastMove.current > 220;
+    yaw.current += driftRad(dt, idle, neglectRef.current);
+    if (yaw.current > Math.PI) yaw.current -= 2 * Math.PI;
+    if (yaw.current < -Math.PI) yaw.current += 2 * Math.PI;
+
     const e = new THREE.Euler(pitch.current, yaw.current, 0, "YXZ");
     camera.quaternion.setFromEuler(e);
 

@@ -31,7 +31,8 @@ export const DEFAULTS = {
   rightBoost: 0.12,   // Over-allocation to the ipsilesional side.
   floor: 0.04,        // Never exactly zero — the input is not actually gone.
   allocentric: 0,     // 0 = purely egocentric, 1 = purely object-centred.
-  leftGain: 0.58,     // Turning left is effortful. See lookGain() below.
+  rightGain: 1.16,    // Turning toward the good side covers more ground.
+  driftDegPerSec: 2.4,  // Unopposed rightward pull when not actively turning.
 };
 
 /**
@@ -133,22 +134,34 @@ export function dwellMs() {
 }
 
 /**
- * DIRECTIONAL HYPOKINESIA — the honest lever.
+ * THE PULL.
  *
- * Patients are slower to initiate movement toward the neglected side, even
- * with the unaffected hand, even when they can see the target perfectly well.
- * It dissociates from the visual deficit and is a documented component of the
- * syndrome in its own right.
+ * An earlier version damped leftward turning, on the reasoning that patients
+ * are slower to move toward the neglected side. It backfired, and the metrics
+ * caught it: participants fought the control, overshot, and ended up spending
+ * MORE time facing left than in the clean run — the exact opposite of the
+ * clinical signature. Damping reduces the ability to turn, and a healthy
+ * person simply pushes harder.
  *
- * Here it means turning left is very slightly heavier than turning right.
- * Individually each movement is imperceptible; across a whole search it adds
- * up to genuinely under-exploring the left side, which is exactly what we
- * want the participant to do without ever noticing they did it.
+ * What is actually reduced in neglect is the pull, not the power. Kinsbourne's
+ * model: both hemispheres push attention contralaterally and normally cancel
+ * out; lose the right one and the left hemisphere's rightward drive is
+ * unopposed. So: no resistance anywhere, a gentle constant drift toward the
+ * good side, and slightly more ground covered when turning that way.
+ *
+ * Nothing to fight, so nothing to notice.
  */
 export function lookGain(movementX, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   if (!o.enabled) return 1;
-  return movementX < 0 ? o.leftGain : 1;   // movementX < 0 turns the view left
+  return movementX > 0 ? o.rightGain : 1;   // movementX > 0 turns the view right
+}
+
+/** Radians of unopposed rightward pull for this frame, applied when idle. */
+export function driftRad(dt, idle, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  if (!o.enabled || !idle) return 0;
+  return -(o.driftDegPerSec * Math.PI / 180) * dt;   // negative yaw = rightward
 }
 
 /**
