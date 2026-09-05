@@ -123,9 +123,13 @@ export function extinguished(candidates, camera, opts = {}) {
  *
  * So misses must come from not looking, never from looking and failing.
  * The lever that produces them is lookGain() below.
+ *
+ * Second playtest still reported a lag on the left, so this is now flat:
+ * identical everywhere, no attention term at all. Any perceptible difference
+ * in responsiveness reads as a bug and costs more than it buys.
  */
-export function dwellMs(weight, base = 190, max = 520, exponent = 0.35) {
-  return Math.min(max, base / Math.pow(Math.max(weight, 0.05), exponent));
+export function dwellMs() {
+  return 150;   // flat, everywhere, always
 }
 
 /**

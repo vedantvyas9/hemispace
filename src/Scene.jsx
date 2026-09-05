@@ -87,7 +87,7 @@ export default function Scene({ scene, neglect, onFind, found }) {
     }
     if (dwell.current.id !== hitId) dwell.current = { id: hitId, ms: 0 };
     dwell.current.ms += dt * 1000;
-    if (dwell.current.ms >= dwellMs(w[hitId] ?? 1)) {
+    if (dwell.current.ms >= dwellMs()) {
       dwell.current = { id: null, ms: 0 };
       onFind(hitId, azimuthDeg(new THREE.Vector3(...scene.targets.find((t) => t.id === hitId).position), camera));
     }
