@@ -12,13 +12,16 @@
   "dependencies": {
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
+    "@sparkjsdev/spark": "^2.1.0",
     "convex": "^1.17.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.169.0"
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.3",
+    "playwright": "^1.63.0",
+    "typescript": "^5.9.3",
     "vite": "^5.4.10"
   }
 }

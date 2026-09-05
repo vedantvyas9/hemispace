@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
+import { useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
 import FirstPerson from "./FirstPerson";
 import Scene from "./Scene";
 import { DEFAULTS, meanGazeDeg } from "./neglect";
 
 const RUNS = ["clean", "neglect"];
+
+function randomCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
 
 export default function App() {
   const [scene, setScene] = useState(null);
@@ -13,7 +19,15 @@ export default function App() {
   const [poses, setPoses] = useState([]);
   const [phase, setPhase] = useState("intro");   // intro | playing | declare | reveal
   const [results, setResults] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
   const guess = useRef("");
+  const code = useRef(randomCode());
+  const runStartedAt = useRef(0);
+
+  const startSession = useMutation(api.sessions.start);
+  const finishSession = useMutation(api.sessions.finish);
+  const recordPose = useMutation(api.poses.record);
+  const recordFind = useMutation(api.finds.record);
 
   useEffect(() => {
     fetch("/scene.json").then((r) => r.json()).then(setScene);
@@ -22,18 +36,49 @@ export default function App() {
   const run = RUNS[runIndex];
   const neglect = { ...DEFAULTS, enabled: run === "neglect" };
 
-  function startRun() { setFound(new Set()); setPoses([]); setPhase("playing"); }
-
-  function handleFind(id) {
-    setFound((prev) => { const n = new Set(prev); n.add(id); return n; });
+  async function startRun() {
+    setFound(new Set());
+    setPoses([]);
+    runStartedAt.current = performance.now();
+    const id = await startSession({ code: code.current, run });
+    setSessionId(id);
+    setPhase("playing");
   }
 
-  function finish() {
+  function handleFind(id, azimuth) {
+    setFound((prev) => { const n = new Set(prev); n.add(id); return n; });
+    if (sessionId != null) {
+      recordFind({
+        sessionId,
+        t: Math.round(performance.now() - runStartedAt.current),
+        targetId: id,
+        azimuth: azimuth ?? 0,
+      });
+    }
+  }
+
+  function handlePose(p) {
+    setPoses((x) => [...x, p]);
+    if (sessionId != null) {
+      recordPose({
+        sessionId,
+        t: Math.round(performance.now() - runStartedAt.current),
+        yaw: p.yaw,
+        pitch: p.pitch,
+      });
+    }
+  }
+
+  async function finish() {
     setResults((r) => [...r, {
       run, found: found.size, total: scene.targets.length,
       gaze: meanGazeDeg(poses), said: Number(guess.current) || null,
     }]);
     guess.current = "";
+    if (sessionId != null) {
+      await finishSession({ sessionId });
+      setSessionId(null);
+    }
     if (runIndex === 0) { setRunIndex(1); setPhase("intro"); }
     else setPhase("reveal");
   }
@@ -43,7 +88,7 @@ export default function App() {
       <Canvas camera={{ fov: 72, near: 0.1, far: 200 }}>
         {scene && (
           <>
-            <FirstPerson spawn={scene.spawn} onPose={(p) => setPoses((x) => [...x, p])} />
+            <FirstPerson spawn={scene.spawn} onPose={handlePose} />
             <Scene scene={scene} neglect={neglect} found={found} onFind={handleFind} />
           </>
         )}
