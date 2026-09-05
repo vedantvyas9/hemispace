@@ -5,7 +5,7 @@ import Scene from "./Scene";
 import { DEFAULTS, meanGazeDeg, leftDwellFraction } from "./neglect";
 
 const RUNS = ["clean", "neglect"];
-const RUN_SECONDS = 45;
+const RUN_SECONDS = 35;
 
 export default function App() {
   const [scene, setScene] = useState(null);
@@ -200,8 +200,9 @@ export default function App() {
               there were <b>{neg.said}</b>. Nothing was hidden and nothing was dark.
               Your attention simply stopped going left.</>
             ) : (
-              <>You found everything both times — the bias is set too gently.
-              Raise <code>midlineShift</code> in <code>neglect.js</code>.</>
+              <>You found them all — but you spent <b>{clean.leftPct.toFixed(0)}%</b> of the
+              first room facing left and only <b>{neg.leftPct.toFixed(0)}%</b> of the second.
+              Nobody asked you to look left less. You just did.</>
             )}
           </p>
           <p className="small">You saw all of it. This is what registered.</p>
