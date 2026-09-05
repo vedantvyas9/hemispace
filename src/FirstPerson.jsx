@@ -1,14 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { lookGain, pullRad } from "./neglect";
+import { lookGain, pullRad, limitGain } from "./neglect";
 
 /**
  * Pointer-lock first person controller.
  * The camera's forward direction IS the body midline for the neglect model,
  * so this has to feel right before anything else gets built on top of it.
  */
-export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect }) {
+export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect, yawLimits = null }) {
   const { camera, gl } = useThree();
   const keys = useRef({});
   const yaw = useRef(spawn?.yaw ?? 0);
@@ -16,6 +16,8 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect }) {
   const lastEmit = useRef(0);
   const neglectRef = useRef(neglect);
   neglectRef.current = neglect;
+  const limitsRef = useRef(yawLimits);
+  limitsRef.current = yawLimits;
   const lastMove = useRef(0);
 
   useEffect(() => {
@@ -27,7 +29,9 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect }) {
     const el = gl.domElement;
     const onMove = (e) => {
       if (document.pointerLockElement !== el) return;
-      yaw.current -= e.movementX * 0.0022 * lookGain(e.movementX, neglectRef.current);
+      const g = lookGain(e.movementX, neglectRef.current)
+             * limitGain(yaw.current, e.movementX, limitsRef.current);
+      yaw.current -= e.movementX * 0.0022 * g;
       lastMove.current = performance.now();
       // Wrap to [-PI, PI]. Without this the metric drifts to nonsense
       // as soon as someone spins more than once.

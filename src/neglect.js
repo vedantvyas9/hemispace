@@ -223,3 +223,33 @@ export function meanGazeDeg(poses) {
   }
   return den > 0 ? num / den : poses[poses.length - 1].yaw;
 }
+
+/**
+ * A soft ceiling on how far the head can turn.
+ *
+ * This is a stage decision, not a clinical one, and it should be described as
+ * such: a real patient can turn their head anywhere they like, they simply do
+ * not think to. But in a live demo an anxious volunteer will sweep the full
+ * circle, show the audience the empty left half, and spend the reveal before
+ * it has been set up.
+ *
+ * So round two allows a full turn to the right — the objects behind on that
+ * side still have to be findable — and gets progressively heavier toward the
+ * left, easing to a stop rather than hitting a wall. Nothing snaps back and
+ * nothing locks, so it reads as the head simply not wanting to go further.
+ */
+export const YAW_LIMITS = { maxLeftDeg: 38, maxRightDeg: 170, bandDeg: 22 };
+
+/** Multiplier for a turn, 1 in open space and easing to near zero at a limit. */
+export function limitGain(yaw, movementX, limits) {
+  if (!limits) return 1;
+  const { maxLeftDeg, maxRightDeg, bandDeg } = limits;
+  const deg = (yaw * 180) / Math.PI;          // positive = facing left
+  const turningLeft = movementX < 0;
+  const edge = turningLeft ? maxLeftDeg : -maxRightDeg;
+  const dist = turningLeft ? edge - deg : deg - edge;
+  if (dist >= bandDeg) return 1;
+  if (dist <= 0) return 0.02;
+  const t = dist / bandDeg;
+  return 0.02 + 0.98 * (t * t * (3 - 2 * t));   // smoothstep
+}

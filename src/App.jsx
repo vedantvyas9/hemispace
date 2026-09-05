@@ -4,7 +4,7 @@ import FirstPerson from "./FirstPerson";
 import Scene from "./Scene";
 import { RevealCamera, GazeFan } from "./Reveal3D";
 import BrainPanel from "./BrainPanel";
-import { DEFAULTS, meanGazeDeg, leftDwellFraction } from "./neglect";
+import { DEFAULTS, meanGazeDeg, leftDwellFraction, YAW_LIMITS } from "./neglect";
 
 const SECONDS = 25;
 const CLEAN = { ...DEFAULTS, enabled: false };
@@ -101,6 +101,7 @@ export default function App() {
               <FirstPerson
                 spawn={scene.spawn}
                 neglect={CLEAN}
+                yawLimits={round === 2 ? YAW_LIMITS : null}
                 onPose={(p) => { if (phase === "run") setPoses((x) => [...x, p]); }}
               />
             )}
