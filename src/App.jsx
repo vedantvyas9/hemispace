@@ -5,7 +5,7 @@ import Scene from "./Scene";
 import { DEFAULTS, meanGazeDeg, leftDwellFraction } from "./neglect";
 
 const RUNS = ["clean", "neglect"];
-const RUN_SECONDS = 35;
+const RUN_SECONDS = 25;
 
 export default function App() {
   const [scene, setScene] = useState(null);

@@ -32,9 +32,11 @@ function Target({ target, found, weight, suppressed }) {
   useFrame((_, dt) => {
     if (!ref.current) return;
     const m = ref.current.material;
-    // Salience, not availability. A low-attention object looks unremarkable;
-    // it never stops responding once the crosshair is actually on it.
-    const wantEmissive = found ? 0.9 : suppressed ? 0 : 0.42 * Math.max(0, weight - 0.35);
+    // Identical appearance everywhere. Tying brightness to attention made
+    // left-side objects genuinely dim in a dark room, which is a visibility
+    // problem, not an attention one — the exact confusion this project exists
+    // to avoid. Every object is equally easy to see; only where you look differs.
+    const wantEmissive = found ? 0.95 : suppressed ? 0.1 : 0.3;
     m.emissiveIntensity += (wantEmissive - m.emissiveIntensity) * Math.min(1, dt * 8);
   });
   return (
@@ -99,7 +101,7 @@ export default function Scene({ scene, neglect, onFind, found }) {
 
   return (
     <group>
-      <ambientLight intensity={0.45} />
+      <ambientLight intensity={0.62} />
       <directionalLight position={[4, 8, 2]} intensity={1.1} />
       <Room />
       <group ref={groupRef}>

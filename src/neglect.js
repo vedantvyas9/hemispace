@@ -31,7 +31,7 @@ export const DEFAULTS = {
   rightBoost: 0.12,   // Over-allocation to the ipsilesional side.
   floor: 0.04,        // Never exactly zero — the input is not actually gone.
   allocentric: 0,     // 0 = purely egocentric, 1 = purely object-centred.
-  leftGain: 0.72,     // Turning left is effortful. See lookGain() below.
+  leftGain: 0.58,     // Turning left is effortful. See lookGain() below.
 };
 
 /**
