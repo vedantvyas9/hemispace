@@ -116,7 +116,11 @@ export default function App() {
       >
         {scene && (
           <>
-            <FirstPerson spawn={scene.spawn} onPose={(p) => setPoses((x) => [...x, p])} />
+            <FirstPerson
+              spawn={scene.spawn}
+              neglect={neglect}
+              onPose={(p) => setPoses((x) => [...x, p])}
+            />
             <Scene scene={scene} neglect={neglect} found={found} onFind={handleFind} />
           </>
         )}

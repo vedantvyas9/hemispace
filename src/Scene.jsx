@@ -32,7 +32,9 @@ function Target({ target, found, weight, suppressed }) {
   useFrame((_, dt) => {
     if (!ref.current) return;
     const m = ref.current.material;
-    const wantEmissive = found ? 0.9 : suppressed ? 0 : weight > 0.55 ? 0.35 : 0;
+    // Salience, not availability. A low-attention object looks unremarkable;
+    // it never stops responding once the crosshair is actually on it.
+    const wantEmissive = found ? 0.9 : suppressed ? 0 : 0.42 * Math.max(0, weight - 0.35);
     m.emissiveIntensity += (wantEmissive - m.emissiveIntensity) * Math.min(1, dt * 8);
   });
   return (

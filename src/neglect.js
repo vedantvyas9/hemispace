@@ -31,6 +31,7 @@ export const DEFAULTS = {
   rightBoost: 0.12,   // Over-allocation to the ipsilesional side.
   floor: 0.04,        // Never exactly zero — the input is not actually gone.
   allocentric: 0,     // 0 = purely egocentric, 1 = purely object-centred.
+  leftGain: 0.72,     // Turning left is effortful. See lookGain() below.
 };
 
 /**
@@ -111,12 +112,39 @@ export function extinguished(candidates, camera, opts = {}) {
 }
 
 /**
- * Dwell time before an object registers. Cheap on the right, punishing on the
- * left. The exponent matters: a linear cost is easy to brute-force by simply
- * staring, which is exactly what a motivated healthy participant will do.
+ * Dwell before an object registers.
+ *
+ * Kept deliberately small and nearly flat across the field. An earlier version
+ * made left-side objects expensive to register, and it produced the wrong
+ * subjective experience entirely: participants reported seeing an object,
+ * aiming at it, and having it refuse to respond. That is a broken interface,
+ * not neglect. A real patient who does orient to a left-side object perceives
+ * it normally — the deficit is that they never orient there.
+ *
+ * So misses must come from not looking, never from looking and failing.
+ * The lever that produces them is lookGain() below.
  */
-export function dwellMs(weight, base = 260, max = 4200, exponent = 1.6) {
-  return Math.min(max, base / Math.pow(Math.max(weight, 0.02), exponent));
+export function dwellMs(weight, base = 190, max = 520, exponent = 0.35) {
+  return Math.min(max, base / Math.pow(Math.max(weight, 0.05), exponent));
+}
+
+/**
+ * DIRECTIONAL HYPOKINESIA — the honest lever.
+ *
+ * Patients are slower to initiate movement toward the neglected side, even
+ * with the unaffected hand, even when they can see the target perfectly well.
+ * It dissociates from the visual deficit and is a documented component of the
+ * syndrome in its own right.
+ *
+ * Here it means turning left is very slightly heavier than turning right.
+ * Individually each movement is imperceptible; across a whole search it adds
+ * up to genuinely under-exploring the left side, which is exactly what we
+ * want the participant to do without ever noticing they did it.
+ */
+export function lookGain(movementX, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  if (!o.enabled) return 1;
+  return movementX < 0 ? o.leftGain : 1;   // movementX < 0 turns the view left
 }
 
 /**
