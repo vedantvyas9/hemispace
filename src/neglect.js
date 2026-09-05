@@ -31,8 +31,10 @@ export const DEFAULTS = {
   rightBoost: 0.12,   // Over-allocation to the ipsilesional side.
   floor: 0.04,        // Never exactly zero — the input is not actually gone.
   allocentric: 0,     // 0 = purely egocentric, 1 = purely object-centred.
-  rightGain: 1.16,    // Turning toward the good side covers more ground.
-  driftDegPerSec: 2.4,  // Unopposed rightward pull when not actively turning.
+  rightGain: 1.28,      // Turning toward the good side covers more ground.
+  equilibriumDeg: 24,   // Where attention comes to rest, right of body midline.
+  pullStiffness: 0.55,  // How insistently it returns there.
+  maxPullDegPerSec: 9,  // Ceiling, so it never feels like a stuck control.
 };
 
 /**
@@ -157,11 +159,29 @@ export function lookGain(movementX, opts = {}) {
   return movementX > 0 ? o.rightGain : 1;   // movementX > 0 turns the view right
 }
 
-/** Radians of unopposed rightward pull for this frame, applied when idle. */
-export function driftRad(dt, idle, opts = {}) {
+/**
+ * The pull, as a displaced equilibrium rather than a constant drift.
+ *
+ * Attention has a resting position. In neglect that position sits well to the
+ * right of the body midline, so the further left you are, the harder it pulls
+ * you back — and once you are on the good side it does nothing at all. A flat
+ * drift could not do this: it pushed just as hard when the participant was
+ * already looking right, which is not what the model says and wasted its
+ * effect where it was not needed.
+ *
+ * Applied only while the participant is not actively turning, and capped, so
+ * it never reads as a stuck control.
+ *
+ * @param yaw current yaw in radians (positive = facing left)
+ */
+export function pullRad(yaw, dt, idle, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   if (!o.enabled || !idle) return 0;
-  return -(o.driftDegPerSec * Math.PI / 180) * dt;   // negative yaw = rightward
+  const equilibrium = -(o.equilibriumDeg * Math.PI) / 180;   // negative = right
+  const err = yaw - equilibrium;                              // >0 means left of rest
+  const max = (o.maxPullDegPerSec * Math.PI) / 180;
+  const rate = Math.max(-max, Math.min(max, err * o.pullStiffness));
+  return -rate * dt;
 }
 
 /**

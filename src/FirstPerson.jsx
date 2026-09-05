@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { lookGain, driftRad } from "./neglect";
+import { lookGain, pullRad } from "./neglect";
 
 /**
  * Pointer-lock first person controller.
@@ -52,7 +52,7 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect }) {
   useFrame((state, dt) => {
     // The pull only shows itself when the participant is not actively turning.
     const idle = performance.now() - lastMove.current > 220;
-    yaw.current += driftRad(dt, idle, neglectRef.current);
+    yaw.current += pullRad(yaw.current, dt, idle, neglectRef.current);
     if (yaw.current > Math.PI) yaw.current -= 2 * Math.PI;
     if (yaw.current < -Math.PI) yaw.current += 2 * Math.PI;
 
