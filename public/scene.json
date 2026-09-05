@@ -1,0 +1,12 @@
+{
+  "world": { "splatUrl": null, "colliderUrl": null },
+  "spawn": { "position": [0, 1.6, 0], "yaw": 0 },
+  "targets": [
+    { "id": "t1", "url": null, "position": [-3.2, 0.9, -4.0], "scale": 1 },
+    { "id": "t2", "url": null, "position": [-2.1, 1.1, -6.5], "scale": 1 },
+    { "id": "t3", "url": null, "position": [-4.0, 0.8, -2.2], "scale": 1 },
+    { "id": "t4", "url": null, "position": [2.4, 0.9, -5.0], "scale": 1 },
+    { "id": "t5", "url": null, "position": [3.6, 1.0, -3.1], "scale": 1 },
+    { "id": "t6", "url": null, "position": [1.8, 0.85, -7.0], "scale": 1 }
+  ]
+}
