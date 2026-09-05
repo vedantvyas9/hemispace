@@ -52,7 +52,10 @@ export default function Extinction({ neglect, onDone }) {
     // one never reaches awareness. We remove it from the display, and say so
     // plainly afterwards — the participant cannot tell the difference between
     // "removed" and "unattended", which is exactly the lesson.
-    const suppressed = neglect && trial.type === "both" && Math.random() < 0.85;
+    // Not every competing trial. Real extinction is probabilistic, and a flat
+    // 0% reads to a sceptical viewer as "you simply did not show it" rather
+    // than as a measurement. Letting one or two through makes it a gradient.
+    const suppressed = neglect && trial.type === "both" && Math.random() < 0.8;
     const shown = {
       left: (trial.type === "left" || trial.type === "both") && !suppressed,
       right: trial.type === "right" || trial.type === "both",
