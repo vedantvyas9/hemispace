@@ -86,7 +86,9 @@ export default function App() {
             <FirstPerson
               spawn={scene.spawn}
               neglect={CLEAN}
-              onPose={(p) => setPoses((x) => [...x, p])}
+              // Only while searching. Emitting at 3Hz for the whole session
+              // re-rendered App constantly and broke the flash timers.
+              onPose={(p) => { if (phase === "search") setPoses((x) => [...x, p]); }}
             />
             <Scene scene={scene} neglect={CLEAN} found={found} onFind={(id) =>
               setFound((prev) => { const n = new Set(prev); n.add(id); return n; })} />

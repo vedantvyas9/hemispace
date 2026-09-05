@@ -37,12 +37,15 @@ export default function Extinction({ neglect, onDone }) {
   const [flash, setFlash] = useState(null);      // { left, right }
   const [awaiting, setAwaiting] = useState(false);
   const results = useRef([]);
-  const timers = useRef([]);
 
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  // onDone is an inline arrow in the parent, so it is a new function on every
+  // render. Keeping it in the dependency list re-ran this effect three times a
+  // second and cancelled the pending flash before it could fire.
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
-    if (i >= trials.length) { onDone(results.current); return; }
+    if (i >= trials.length) { onDoneRef.current(results.current); return; }
     const trial = trials[i];
 
     // Under neglect, a left stimulus presented at the same moment as a right
@@ -56,14 +59,13 @@ export default function Extinction({ neglect, onDone }) {
     };
 
     const gap = GAP_MIN + Math.random() * GAP_JITTER;
+    let b;
     const a = setTimeout(() => {
       setFlash(shown);
-      const b = setTimeout(() => { setFlash(null); setAwaiting(true); }, FLASH_MS);
-      timers.current.push(b);
+      b = setTimeout(() => { setFlash(null); setAwaiting(true); }, FLASH_MS);
     }, gap);
-    timers.current.push(a);
-    return () => { clearTimeout(a); };
-  }, [i, trials, neglect, onDone]);
+    return () => { clearTimeout(a); clearTimeout(b); };
+  }, [i, trials, neglect]);
 
   function respond(answer) {
     if (!awaiting) return;
