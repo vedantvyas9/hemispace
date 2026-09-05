@@ -26,8 +26,8 @@ const _r = new THREE.Vector3();
 
 export const DEFAULTS = {
   enabled: false,
-  midlineShift: 12,   // deg. Where attention has already halved. Severity knob.
-  spread: 20,         // deg. How abruptly it falls away. Smaller = sharper.
+  midlineShift: 18,   // deg. Where attention has already halved. Severity knob.
+  spread: 16,         // deg. How abruptly it falls away. Smaller = sharper.
   rightBoost: 0.12,   // Over-allocation to the ipsilesional side.
   floor: 0.04,        // Never exactly zero — the input is not actually gone.
   allocentric: 0,     // 0 = purely egocentric, 1 = purely object-centred.
@@ -110,9 +110,29 @@ export function extinguished(candidates, camera, opts = {}) {
   return out;
 }
 
-/** Dwell time before an object registers. Cheap on the right, costly on the left. */
-export function dwellMs(weight, base = 220, max = 2600) {
-  return Math.min(max, base / Math.max(weight, 0.02));
+/**
+ * Dwell time before an object registers. Cheap on the right, punishing on the
+ * left. The exponent matters: a linear cost is easy to brute-force by simply
+ * staring, which is exactly what a motivated healthy participant will do.
+ */
+export function dwellMs(weight, base = 260, max = 4200, exponent = 1.6) {
+  return Math.min(max, base / Math.pow(Math.max(weight, 0.02), exponent));
+}
+
+/**
+ * Fraction of the run spent facing left of the body midline. More robust than
+ * the mean when someone spins, and immediately legible to a non-specialist:
+ * "you spent 11% of your time looking at half the room."
+ */
+export function leftDwellFraction(poses) {
+  if (poses.length < 2) return 0;
+  let left = 0, total = 0;
+  for (let i = 1; i < poses.length; i++) {
+    const dt = Math.max(0, poses[i].t - poses[i - 1].t);
+    total += dt;
+    if (poses[i].yaw < 0) left += dt;
+  }
+  return total > 0 ? left / total : 0;
 }
 
 /**

@@ -2,18 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import FirstPerson from "./FirstPerson";
 import Scene from "./Scene";
-import { DEFAULTS, meanGazeDeg } from "./neglect";
+import { DEFAULTS, meanGazeDeg, leftDwellFraction } from "./neglect";
 
 const RUNS = ["clean", "neglect"];
+const RUN_SECONDS = 45;
 
 export default function App() {
   const [scene, setScene] = useState(null);
   const [runIndex, setRunIndex] = useState(0);
   const [found, setFound] = useState(new Set());
   const [poses, setPoses] = useState([]);
-  const [phase, setPhase] = useState("intro");   // intro | playing | declare | reveal
+  const [phase, setPhase] = useState("intro");
   const [results, setResults] = useState([]);
-  const guess = useRef("");
+  const [left, setLeft] = useState(RUN_SECONDS);
+  const guess = useRef(0);
 
   useEffect(() => {
     fetch("/scene.json").then((r) => r.json()).then(setScene);
@@ -25,15 +27,28 @@ export default function App() {
   function startRun() {
     setFound(new Set());
     setPoses([]);
+    setLeft(RUN_SECONDS);
     setPhase("playing");
   }
 
-  // Pointer lock hides the cursor, so the button is unclickable while playing.
-  // Enter is the way out, and we release the lock so the next screen is usable.
   function declare() {
     document.exitPointerLock?.();
     setPhase("declare");
   }
+
+  // The clock is what makes this a search, not an audit. Real patients stop
+  // early because the room feels finished; a healthy participant with
+  // unlimited time will simply grind until they have everything.
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const id = setInterval(() => {
+      setLeft((s) => {
+        if (s <= 1) { clearInterval(id); declare(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -46,31 +61,32 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [phase]);
 
-  // Never leave the pointer captured on a screen that has controls.
   useEffect(() => {
     if (phase !== "playing") document.exitPointerLock?.();
   }, [phase]);
 
+  useEffect(() => { guess.current = found.size; }, [found]);
+
   function handleFind(id) {
-    setFound((prev) => {
-      const n = new Set(prev);
-      n.add(id);
-      return n;
-    });
+    setFound((prev) => { const n = new Set(prev); n.add(id); return n; });
   }
 
   function finish() {
+    const missed = scene.targets.filter((t) => !found.has(t.id)).map((t) => t.id);
     setResults((r) => [...r, {
       run,
       found: found.size,
       total: scene.targets.length,
+      missed,
       gaze: meanGazeDeg(poses),
-      said: Number(guess.current) || null,
+      leftPct: leftDwellFraction(poses) * 100,
+      said: Number(guess.current),
     }]);
-    guess.current = "";
     if (runIndex === 0) { setRunIndex(1); setPhase("intro"); }
     else setPhase("reveal");
   }
+
+  const clean = results[0], neg = results[1];
 
   return (
     <div className="app">
@@ -87,11 +103,12 @@ export default function App() {
         <>
           <div className="crosshair" />
           <div className="hud">
+            <span className={left <= 10 ? "urgent" : ""}>{left}s</span>
+            <span className="sep" />
             <span>Found {found.size}</span>
             <kbd>Enter</kbd>
-            <span className="dim">when you're done</span>
           </div>
-          <div className="hint">Click to look around · WASD to walk · Esc releases the mouse</div>
+          <div className="hint">Click to look around · WASD to walk · Enter when you're done</div>
         </>
       )}
 
@@ -99,8 +116,8 @@ export default function App() {
         <div className="overlay">
           <h1>Hemispace</h1>
           <p>
-            There are {scene?.targets.length ?? "several"} objects in this room.
-            Click to look around, WASD to walk. Find them all, then press Enter.
+            There are objects hidden around this room. You have {RUN_SECONDS} seconds
+            to find as many as you can. Click to look around, WASD to walk.
           </p>
           <button onClick={startRun}>{runIndex === 0 ? "Start" : "Once more, new room"}</button>
         </div>
@@ -108,7 +125,8 @@ export default function App() {
 
       {phase === "declare" && (
         <div className="overlay">
-          <h2>How many did you find?</h2>
+          <h2>How many were in the room?</h2>
+          <p>Your best guess — not how many you found.</p>
           <input
             type="number"
             defaultValue={found.size}
@@ -120,25 +138,40 @@ export default function App() {
         </div>
       )}
 
-      {phase === "reveal" && (
-        <div className="overlay">
+      {phase === "reveal" && clean && neg && (
+        <div className="overlay wide">
           <h2>What got through</h2>
           <table>
             <thead>
-              <tr><th>Run</th><th>Found</th><th>You said</th><th>Mean gaze</th></tr>
+              <tr><th>Run</th><th>Found</th><th>You said</th><th>Mean gaze</th><th>Time facing left</th></tr>
             </thead>
             <tbody>
               {results.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.run}</td>
+                <tr key={i} className={r.run === "neglect" ? "row-neg" : ""}>
+                  <td>{r.run === "clean" ? "First room" : "Second room"}</td>
                   <td>{r.found} / {r.total}</td>
-                  <td>{r.said ?? "—"}</td>
+                  <td>{r.said || "—"}</td>
                   <td>{r.gaze.toFixed(1)}°</td>
+                  <td>{r.leftPct.toFixed(0)}%</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="small">You saw everything. This is what registered.</p>
+
+          <p className="verdict">
+            {neg.found < clean.found ? (
+              <>You missed <b>{clean.found - neg.found}</b> in the second room, and told us
+              there were <b>{neg.said}</b>. Nothing was hidden and nothing was dark.
+              Your attention simply stopped going left.</>
+            ) : (
+              <>You found everything both times — the bias is set too gently.
+              Raise <code>midlineShift</code> in <code>neglect.js</code>.</>
+            )}
+          </p>
+          <p className="small">You saw all of it. This is what registered.</p>
+          <button onClick={() => { setResults([]); setRunIndex(0); setPhase("intro"); }}>
+            Run it again
+          </button>
         </div>
       )}
     </div>

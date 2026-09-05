@@ -2,11 +2,13 @@
   "world": { "splatUrl": null, "colliderUrl": null },
   "spawn": { "position": [0, 1.6, 0], "yaw": 0 },
   "targets": [
-    { "id": "t1", "url": null, "position": [-3.2, 0.9, -4.0], "scale": 1 },
-    { "id": "t2", "url": null, "position": [-2.1, 1.1, -6.5], "scale": 1 },
-    { "id": "t3", "url": null, "position": [-4.0, 0.8, -2.2], "scale": 1 },
-    { "id": "t4", "url": null, "position": [2.4, 0.9, -5.0], "scale": 1 },
-    { "id": "t5", "url": null, "position": [3.6, 1.0, -3.1], "scale": 1 },
-    { "id": "t6", "url": null, "position": [1.8, 0.85, -7.0], "scale": 1 }
+    { "id": "t1", "url": null, "position": [-6.4, 0.95, -3.0], "scale": 1 },
+    { "id": "t2", "url": null, "position": [-4.6, 1.10, -6.2], "scale": 1 },
+    { "id": "t3", "url": null, "position": [-2.5, 0.80, -8.4], "scale": 1 },
+    { "id": "t4", "url": null, "position": [-7.2, 1.05, -6.0], "scale": 1 },
+    { "id": "t5", "url": null, "position": [ 5.8, 0.95, -2.8], "scale": 1 },
+    { "id": "t6", "url": null, "position": [ 3.9, 1.05, -6.0], "scale": 1 },
+    { "id": "t7", "url": null, "position": [ 2.1, 0.85, -8.6], "scale": 1 },
+    { "id": "t8", "url": null, "position": [ 6.9, 1.00, -5.4], "scale": 1 }
   ]
 }

@@ -50,3 +50,11 @@ th { color: #7a8898; font-weight: 500; font-size: 12px; text-transform: uppercas
   font-size: 13px; color: #7a8898; background: rgba(13,17,23,.75);
   padding: 8px 16px; border-radius: 999px; pointer-events: none;
 }
+
+.hud .sep { width: 1px; height: 16px; background: #30363d; }
+.hud .urgent { color: #f0883e; font-variant-numeric: tabular-nums; }
+.overlay.wide p { max-width: 52ch; }
+.row-neg td { color: #f0a882; }
+.verdict { font-size: 17px; color: #e6edf3 !important; line-height: 1.6; }
+.verdict b { color: #f0883e; }
+code { font-family: ui-monospace, monospace; background: #21262d; padding: 1px 6px; border-radius: 4px; font-size: .9em; }

@@ -25,6 +25,10 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose }) {
     const onMove = (e) => {
       if (document.pointerLockElement !== el) return;
       yaw.current -= e.movementX * 0.0022;
+      // Wrap to [-PI, PI]. Without this the metric drifts to nonsense
+      // as soon as someone spins more than once.
+      if (yaw.current > Math.PI) yaw.current -= 2 * Math.PI;
+      if (yaw.current < -Math.PI) yaw.current += 2 * Math.PI;
       pitch.current -= e.movementY * 0.0022;
       pitch.current = Math.max(-1.2, Math.min(1.2, pitch.current));
     };
