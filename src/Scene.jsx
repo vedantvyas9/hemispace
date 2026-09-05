@@ -23,6 +23,10 @@ function Room() {
         <boxGeometry args={[0.2, 6, 24]} />
         <meshStandardMaterial color="#333941" />
       </mesh>
+      <mesh position={[0, 3, 8]}>
+        <boxGeometry args={[24, 6, 0.2]} />
+        <meshStandardMaterial color="#2f353d" />
+      </mesh>
     </group>
   );
 }

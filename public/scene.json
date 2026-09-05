@@ -2,19 +2,19 @@
   "world": { "splatUrl": null, "colliderUrl": null },
   "spawn": { "position": [0, 1.6, 0], "yaw": 0 },
   "targets": [
-    { "id": "L1", "url": null, "position": [-8.5, 0.90, -1.5], "scale": 0.85 },
-    { "id": "L2", "url": null, "position": [-6.8, 1.20, -4.5], "scale": 0.85 },
-    { "id": "L3", "url": null, "position": [-4.5, 0.80, -7.5], "scale": 0.85 },
-    { "id": "L4", "url": null, "position": [-2.6, 1.00, -9.8], "scale": 0.85 },
-    { "id": "L5", "url": null, "position": [-9.0, 1.10, -6.8], "scale": 0.85 },
-    { "id": "L6", "url": null, "position": [-5.4, 0.85, -2.1], "scale": 0.85 },
-    { "id": "L7", "url": null, "position": [-7.6, 1.00, -9.2], "scale": 0.85 },
-    { "id": "R1", "url": null, "position": [ 8.2, 0.90, -1.8], "scale": 0.85 },
-    { "id": "R2", "url": null, "position": [ 6.5, 1.15, -4.8], "scale": 0.85 },
-    { "id": "R3", "url": null, "position": [ 4.2, 0.80, -7.8], "scale": 0.85 },
-    { "id": "R4", "url": null, "position": [ 2.3, 1.00, -9.9], "scale": 0.85 },
-    { "id": "R5", "url": null, "position": [ 9.0, 1.05, -6.9], "scale": 0.85 },
-    { "id": "R6", "url": null, "position": [ 5.2, 0.90, -2.2], "scale": 0.85 },
-    { "id": "R7", "url": null, "position": [ 7.2, 1.00, -9.3], "scale": 0.85 }
+    { "id": "L1", "url": null, "position": [-8.5, 0.90, -1.5], "scale": 0.8 },
+    { "id": "L2", "url": null, "position": [-6.8, 1.20, -4.5], "scale": 0.8 },
+    { "id": "L3", "url": null, "position": [-4.5, 0.80, -7.5], "scale": 0.8 },
+    { "id": "L4", "url": null, "position": [-2.6, 1.00, -9.8], "scale": 0.8 },
+    { "id": "L5", "url": null, "position": [-9.0, 1.10,  1.5], "scale": 0.8 },
+    { "id": "L6", "url": null, "position": [-6.0, 0.90,  5.5], "scale": 0.8 },
+    { "id": "L7", "url": null, "position": [-2.5, 1.05,  7.0], "scale": 0.8 },
+    { "id": "R1", "url": null, "position": [ 8.2, 0.90, -1.8], "scale": 0.8 },
+    { "id": "R2", "url": null, "position": [ 6.5, 1.15, -4.8], "scale": 0.8 },
+    { "id": "R3", "url": null, "position": [ 4.2, 0.80, -7.8], "scale": 0.8 },
+    { "id": "R4", "url": null, "position": [ 2.3, 1.00, -9.9], "scale": 0.8 },
+    { "id": "R5", "url": null, "position": [ 9.0, 1.05,  1.8], "scale": 0.8 },
+    { "id": "R6", "url": null, "position": [ 6.2, 0.90,  5.8], "scale": 0.8 },
+    { "id": "R7", "url": null, "position": [ 2.4, 1.00,  7.2], "scale": 0.8 }
   ]
 }

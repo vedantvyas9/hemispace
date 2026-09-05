@@ -31,10 +31,11 @@ export const DEFAULTS = {
   rightBoost: 0.12,   // Over-allocation to the ipsilesional side.
   floor: 0.04,        // Never exactly zero — the input is not actually gone.
   allocentric: 0,     // 0 = purely egocentric, 1 = purely object-centred.
-  rightGain: 1.28,      // Turning toward the good side covers more ground.
-  equilibriumDeg: 24,   // Where attention comes to rest, right of body midline.
-  pullStiffness: 0.55,  // How insistently it returns there.
-  maxPullDegPerSec: 9,  // Ceiling, so it never feels like a stuck control.
+  rightGain: 1.34,      // Turning toward the good side covers more ground.
+  equilibriumDeg: 30,   // Where attention comes to rest, right of body midline.
+  pullStiffness: 0.7,   // How insistently it returns there.
+  maxPullDegPerSec: 13, // Ceiling, so it never feels like a stuck control.
+  activePullScale: 0.5, // The pull does not switch off while you are turning.
 };
 
 /**
@@ -169,18 +170,22 @@ export function lookGain(movementX, opts = {}) {
  * already looking right, which is not what the model says and wasted its
  * effect where it was not needed.
  *
- * Applied only while the participant is not actively turning, and capped, so
- * it never reads as a stuck control.
+ * Applied at full strength while still and at half strength while turning.
+ * An earlier version switched it off entirely during movement, which meant
+ * that across an active 25-second search — where the mouse is almost always
+ * moving — it barely applied at all. A displaced equilibrium does not pause
+ * because you happen to be looking around.
  *
  * @param yaw current yaw in radians (positive = facing left)
  */
 export function pullRad(yaw, dt, idle, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
-  if (!o.enabled || !idle) return 0;
+  if (!o.enabled) return 0;
+  const scale = idle ? 1 : o.activePullScale;
   const equilibrium = -(o.equilibriumDeg * Math.PI) / 180;   // negative = right
   const err = yaw - equilibrium;                              // >0 means left of rest
   const max = (o.maxPullDegPerSec * Math.PI) / 180;
-  const rate = Math.max(-max, Math.min(max, err * o.pullStiffness));
+  const rate = Math.max(-max, Math.min(max, err * o.pullStiffness)) * scale;
   return -rate * dt;
 }
 
