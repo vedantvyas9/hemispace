@@ -8,7 +8,10 @@ import { lookGain, pullRad, limitGain } from "./neglect";
  * The camera's forward direction IS the body midline for the neglect model,
  * so this has to feel right before anything else gets built on top of it.
  */
-export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect, yawLimits = null }) {
+export default function FirstPerson({
+  spawn, speed = 3.2, onPose, neglect, yawLimits = null,
+  sensitivity = 0.0022, centerSignal,
+}) {
   const { camera, gl } = useThree();
   const keys = useRef({});
   const yaw = useRef(spawn?.yaw ?? 0);
@@ -18,7 +21,19 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect, yawLi
   neglectRef.current = neglect;
   const limitsRef = useRef(yawLimits);
   limitsRef.current = yawLimits;
+  const sensitivityRef = useRef(sensitivity);
+  sensitivityRef.current = sensitivity;
   const lastMove = useRef(0);
+
+  // Imperative re-center, used by scanning practice: every trial has to start
+  // from the same forward-facing position, or a lucky camera angle left over
+  // from the last trial lets someone skip the scan entirely.
+  useEffect(() => {
+    if (centerSignal === undefined) return;
+    yaw.current = spawn?.yaw ?? 0;
+    pitch.current = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerSignal]);
 
   useEffect(() => {
     const p = spawn?.position ?? [0, 1.6, 0];
@@ -31,13 +46,13 @@ export default function FirstPerson({ spawn, speed = 3.2, onPose, neglect, yawLi
       if (document.pointerLockElement !== el) return;
       const g = lookGain(e.movementX, neglectRef.current)
              * limitGain(yaw.current, e.movementX, limitsRef.current);
-      yaw.current -= e.movementX * 0.0022 * g;
+      yaw.current -= e.movementX * sensitivityRef.current * g;
       lastMove.current = performance.now();
       // Wrap to [-PI, PI]. Without this the metric drifts to nonsense
       // as soon as someone spins more than once.
       if (yaw.current > Math.PI) yaw.current -= 2 * Math.PI;
       if (yaw.current < -Math.PI) yaw.current += 2 * Math.PI;
-      pitch.current -= e.movementY * 0.0022;
+      pitch.current -= e.movementY * sensitivityRef.current;
       pitch.current = Math.max(-1.2, Math.min(1.2, pitch.current));
     };
     const down = (e) => (keys.current[e.code] = true);

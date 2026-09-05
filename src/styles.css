@@ -13,6 +13,23 @@ canvas { display: block; }
   background: rgba(255,255,255,.85); box-shadow: 0 0 0 2px rgba(0,0,0,.35);
   pointer-events: none;
 }
+
+/* Scanning practice: an actual peripheral stimulus, meant to be caught out of
+   the corner of the eye rather than read. Wide and soft, not a UI badge. */
+.periph-glow {
+  position: fixed; top: 0; bottom: 0; width: 22vw; pointer-events: none;
+  animation: periph-pulse 1.1s ease-in-out infinite;
+}
+.periph-glow.left {
+  left: 0;
+  background: linear-gradient(to right, rgba(127,208,245,.55), rgba(127,208,245,0));
+}
+.periph-glow.right {
+  right: 0;
+  background: linear-gradient(to left, rgba(127,208,245,.55), rgba(127,208,245,0));
+}
+@keyframes periph-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .periph-glow { animation: none; opacity: .8; } }
 .hud {
   position: fixed; top: 18px; right: 18px; display: flex; gap: 12px;
   align-items: center; background: rgba(13,17,23,.8); padding: 10px 14px;
