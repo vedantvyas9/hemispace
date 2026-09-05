@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import FirstPerson from "./FirstPerson";
+import { MintWorld, GreyRoom } from "./World";
 import { DEFAULTS, azimuthDeg } from "./neglect";
 
 /**
@@ -45,7 +46,12 @@ import { DEFAULTS, azimuthDeg } from "./neglect";
 const CLEAN = { ...DEFAULTS, enabled: false };
 const TRIALS = 20;
 const TIMEOUT_MS = 6500;
-const RADIUS = 9;
+// Distance only sets how far away things are, not the angle you have to turn
+// through — the drill is about rotation, not walking — so this just needs to
+// stay inside the generated room's real walls. Measured against the current
+// living-room collider (~11m x 9m footprint, spawn off-centre): 2.6m clears
+// every wall with margin regardless of which way you're facing.
+const RADIUS = 2.6;
 const KEY = "hemispace.training.v1";
 const LOOK_SENSITIVITY = 0.0011;   // ~half of the main experience's 0.0022
 const TARGET_DWELL_MS = 380;       // was 130 — a flick shouldn't count as a find
@@ -66,7 +72,7 @@ function cueLevel(ecc) {
   return "none";                    // unaided
 }
 
-function TrainingScene({ trial, onHit, onAzimuth, onAnchorAzimuth }) {
+function TrainingScene({ trial, onHit, onAzimuth, onAnchorAzimuth, world }) {
   const { camera } = useThree();
   const ref = useRef();
   const anchorRef = useRef();
@@ -111,15 +117,16 @@ function TrainingScene({ trial, onHit, onAzimuth, onAnchorAzimuth }) {
     if (dwell.current > TARGET_DWELL_MS) { dwell.current = 0; onHit("target"); }
   });
 
+  const hasWorld = !!world?.splatUrl;
+
   return (
     <group>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[3, 10, 2]} intensity={1} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <circleGeometry args={[16, 48]} />
-        <meshStandardMaterial color="#333a43" />
-      </mesh>
-      <gridHelper args={[32, 32, "#43606f", "#2b343d"]} position={[0, 0.02, 0]} />
+      <ambientLight intensity={hasWorld ? 0.75 : 0.55} />
+      <directionalLight position={[3, 10, 2]} intensity={hasWorld ? 1.4 : 1} />
+
+      <Suspense fallback={null}>
+        {hasWorld ? <MintWorld world={world} /> : <GreyRoom />}
+      </Suspense>
 
       {/* the left anchor */}
       <mesh ref={anchorRef} position={anchorPos}>
@@ -148,6 +155,7 @@ export default function Training({ onExit }) {
   const [heading, setHeading] = useState(0);
   const [anchorAz, setAnchorAz] = useState(0);
   const [streakCount, setStreakCount] = useState(0);
+  const [world, setWorld] = useState(null);
   const canvasRef = useRef(null);
   const streak = useRef({ up: 0, down: 0 });
   const started = useRef(0);
@@ -158,6 +166,13 @@ export default function Training({ onExit }) {
     const c = () => setLocked(!!document.pointerLockElement);
     document.addEventListener("pointerlockchange", c);
     return () => document.removeEventListener("pointerlockchange", c);
+  }, []);
+
+  // Same generated room as the main experience, so practice happens somewhere
+  // that actually looks like a room instead of an abstract grid. Falls back
+  // to the plain grey box if scene.json has no world configured yet.
+  useEffect(() => {
+    fetch("/scene.json").then((r) => r.json()).then((s) => setWorld(s.world ?? null)).catch(() => {});
   }, []);
   function grab() {
     const el = canvasRef.current;
@@ -240,6 +255,7 @@ export default function Training({ onExit }) {
           onHit={handleHit}
           onAzimuth={setHeading}
           onAnchorAzimuth={setAnchorAz}
+          world={world}
         />
       </Canvas>
 
