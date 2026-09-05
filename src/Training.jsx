@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import FirstPerson from "./FirstPerson";
+import { MintWorld, GreyRoom } from "./World";
 import { DEFAULTS, azimuthDeg } from "./neglect";
 
 /**
@@ -18,6 +19,23 @@ import { DEFAULTS, azimuthDeg } from "./neglect";
  *    rather than in failure.
  *  - CUE FADING. Early sessions point at where to look; the pointer is
  *    withdrawn as reach improves, so the habit has to become internal.
+ *  - FORCED RE-CENTER. The camera snaps back to forward before every trial
+ *    (`centerSignal` on FirstPerson). Without this, someone who is already
+ *    facing left from the last rep can "find" the next anchor without moving
+ *    at all — the whole point is repeated, deliberate, large excursions into
+ *    the neglected field, not one lucky orientation held for 20 trials.
+ *  - LOWERED LOOK SENSITIVITY. Reaching the same visual angle here takes
+ *    roughly double the physical mouse travel of the main experience. A
+ *    first-person mouselook lets someone's eyes stay fixed on the centre
+ *    crosshair while a flick of the wrist spins the whole world — that trains
+ *    nothing. Slower turning forces an actual sustained sweep instead of a
+ *    twitch, which is closer to what a real head/eye scan costs.
+ *  - PERIPHERAL CUE, NOT TEXT. The anchor is signalled by an actual glow at
+ *    the edge of the screen (bright side matches its real direction), not
+ *    just an arrow character — something to notice out of the corner of your
+ *    eye and turn toward, the way a real peripheral stimulus works. It fades
+ *    on the same schedule as the old arrow, and the target itself is never
+ *    cued: locating it is the unaided part of the drill.
  *
  * Honest framing, and it belongs in the pitch: the Cochrane review finds the
  * effectiveness of neglect rehabilitation unproven, and even prism adaptation
@@ -28,8 +46,15 @@ import { DEFAULTS, azimuthDeg } from "./neglect";
 const CLEAN = { ...DEFAULTS, enabled: false };
 const TRIALS = 20;
 const TIMEOUT_MS = 6500;
-const RADIUS = 9;
+// Distance only sets how far away things are, not the angle you have to turn
+// through — the drill is about rotation, not walking — so this just needs to
+// stay inside the generated room's real walls. Measured against the current
+// living-room collider (~11m x 9m footprint, spawn off-centre): 2.6m clears
+// every wall with margin regardless of which way you're facing.
+const RADIUS = 2.6;
 const KEY = "hemispace.training.v1";
+const LOOK_SENSITIVITY = 0.0011;   // ~half of the main experience's 0.0022
+const TARGET_DWELL_MS = 380;       // was 130 — a flick shouldn't count as a find
 
 function loadSessions() {
   try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
@@ -47,7 +72,7 @@ function cueLevel(ecc) {
   return "none";                    // unaided
 }
 
-function TrainingScene({ trial, onHit, onAzimuth }) {
+function TrainingScene({ trial, onHit, onAzimuth, onAnchorAzimuth, world }) {
   const { camera } = useThree();
   const ref = useRef();
   const anchorRef = useRef();
@@ -73,11 +98,15 @@ function TrainingScene({ trial, onHit, onAzimuth }) {
     ) * 180) / Math.PI));
 
     if (anchorRef.current) {
-      const seen = Math.abs(azimuthDeg(anchorPos, camera)) < 26;
+      const anchorAz = azimuthDeg(anchorPos, camera);
+      const seen = Math.abs(anchorAz) < 26;
       const m = anchorRef.current.material;
       m.emissiveIntensity += ((trial?.stage === "anchor" ? (seen ? 1.4 : 0.75) : 0) - m.emissiveIntensity) * Math.min(1, dt * 6);
       anchorRef.current.visible = m.emissiveIntensity > 0.02;
-      if (trial?.stage === "anchor" && seen) onHit("anchor");
+      if (trial?.stage === "anchor") {
+        onAnchorAzimuth(anchorAz);
+        if (seen) onHit("anchor");
+      }
     }
 
     if (!ref.current || trial?.stage !== "target") { dwell.current = 0; return; }
@@ -85,18 +114,19 @@ function TrainingScene({ trial, onHit, onAzimuth }) {
     const hit = ray.intersectObject(ref.current, false);
     if (!hit.length) { dwell.current = 0; return; }
     dwell.current += dt * 1000;
-    if (dwell.current > 130) { dwell.current = 0; onHit("target"); }
+    if (dwell.current > TARGET_DWELL_MS) { dwell.current = 0; onHit("target"); }
   });
+
+  const hasWorld = !!world?.splatUrl;
 
   return (
     <group>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[3, 10, 2]} intensity={1} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <circleGeometry args={[16, 48]} />
-        <meshStandardMaterial color="#333a43" />
-      </mesh>
-      <gridHelper args={[32, 32, "#43606f", "#2b343d"]} position={[0, 0.02, 0]} />
+      <ambientLight intensity={hasWorld ? 0.75 : 0.55} />
+      <directionalLight position={[3, 10, 2]} intensity={hasWorld ? 1.4 : 1} />
+
+      <Suspense fallback={null}>
+        {hasWorld ? <MintWorld world={world} /> : <GreyRoom />}
+      </Suspense>
 
       {/* the left anchor */}
       <mesh ref={anchorRef} position={anchorPos}>
@@ -123,15 +153,26 @@ export default function Training({ onExit }) {
   const [locked, setLocked] = useState(false);
   const [cueOn, setCueOn] = useState(false);
   const [heading, setHeading] = useState(0);
+  const [anchorAz, setAnchorAz] = useState(0);
+  const [streakCount, setStreakCount] = useState(0);
+  const [world, setWorld] = useState(null);
   const canvasRef = useRef(null);
   const streak = useRef({ up: 0, down: 0 });
   const started = useRef(0);
   const sessions = useMemo(loadSessions, [phase]);
+  const bestReachBefore = useMemo(() => Math.max(0, ...sessions.map((s) => s.reached || 0)), [sessions]);
 
   useEffect(() => {
     const c = () => setLocked(!!document.pointerLockElement);
     document.addEventListener("pointerlockchange", c);
     return () => document.removeEventListener("pointerlockchange", c);
+  }, []);
+
+  // Same generated room as the main experience, so practice happens somewhere
+  // that actually looks like a room instead of an abstract grid. Falls back
+  // to the plain grey box if scene.json has no world configured yet.
+  useEffect(() => {
+    fetch("/scene.json").then((r) => r.json()).then((s) => setWorld(s.world ?? null)).catch(() => {});
   }, []);
   function grab() {
     const el = canvasRef.current;
@@ -165,6 +206,7 @@ export default function Training({ onExit }) {
   function record(ok) {
     const ms = performance.now() - started.current;
     setHits((h) => [...h, { left: trial.left, azimuth: trial.azimuth, ok, ms }]);
+    setStreakCount((c) => (ok ? c + 1 : 0));
     const s = streak.current;
     let e = ecc;
     if (ok && ms < 3200) { s.up++; s.down = 0; if (s.up >= 3) { e = Math.min(165, ecc + 12); s.up = 0; } }
@@ -202,8 +244,19 @@ export default function Training({ onExit }) {
   return (
     <div className="app">
       <Canvas camera={{ fov: 74, near: 0.1, far: 200 }} onCreated={({ gl }) => (canvasRef.current = gl.domElement)}>
-        <FirstPerson spawn={{ position: [0, 1.6, 0], yaw: 0 }} neglect={CLEAN} />
-        <TrainingScene trial={phase === "play" ? trial : null} onHit={handleHit} onAzimuth={setHeading} />
+        <FirstPerson
+          spawn={{ position: [0, 1.6, 0], yaw: 0 }}
+          neglect={CLEAN}
+          sensitivity={LOOK_SENSITIVITY}
+          centerSignal={n}
+        />
+        <TrainingScene
+          trial={phase === "play" ? trial : null}
+          onHit={handleHit}
+          onAzimuth={setHeading}
+          onAnchorAzimuth={setAnchorAz}
+          world={world}
+        />
       </Canvas>
 
       {phase === "play" && !locked && (
@@ -212,10 +265,21 @@ export default function Training({ onExit }) {
 
       {phase === "play" && locked && (
         <>
+          {/* The actual cue: a peripheral glow, not text. Catch it in the
+              corner of your eye and turn toward it — that's the scan. */}
+          {trial?.stage === "anchor" && cueOn && Math.abs(anchorAz) >= 26 && (
+            <div className={`periph-glow ${anchorAz < 0 ? "left" : "right"}`} />
+          )}
           <div className="crosshair" />
           <div className="hud">
             <span>{n} / {TRIALS}</span><span className="sep" />
             <span>Reach {Math.round(ecc)}°</span>
+            {streakCount >= 3 && (
+              <>
+                <span className="sep" />
+                <span className="urgent">{streakCount} in a row</span>
+              </>
+            )}
           </div>
           {trial?.stage === "anchor" && (
             <div className="tcue">
@@ -231,9 +295,11 @@ export default function Training({ onExit }) {
         <div className="overlay">
           <h1>Scanning practice</h1>
           <p>
-            Each round begins on your left. Find the blue post, then find the light that
-            appears. The lights move further out as you keep up, and the arrow pointing
-            you left is taken away as your reach grows.
+            Each round begins facing forward. Find the blue post on your left, then find the
+            light that appears — watch for a glow at the edge of your screen before you turn,
+            not just the arrow. The lights move further out as you keep up, and the cue fades
+            as your reach grows. Turning is slower here on purpose: it takes a real sweep to
+            get there, not a flick.
           </p>
           <p className="small">
             Based on visual scanning training, the standard clinical approach. Practice and
@@ -264,6 +330,9 @@ export default function Training({ onExit }) {
           <p className="verdict">
             You reached <b>{reached}°</b> into your left side today, and your current
             practice range is <b>{Math.round(ecc)}°</b>.
+            {reached > bestReachBefore && bestReachBefore > 0 && (
+              <> <span style={{ color: "#4ea87a" }}>New best — up from {bestReachBefore}°.</span></>
+            )}
           </p>
           {sessions.length > 1 && <Progress sessions={sessions} />}
           <div className="row">

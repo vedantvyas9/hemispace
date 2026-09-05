@@ -1,14 +1,22 @@
 import { useCallback, useMemo, useRef, useState, Suspense } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { dwellMs } from "./neglect";
+import { attentionWeight } from "./neglect";
 import { MintWorld, GreyRoom, Target, resolveTargetId } from "./World";
 
-export default function Scene({ scene, hidden, found, onFind, reveal = false, dissolve = false }) {
+/**
+ * The room and everything findable in it.
+ *
+ * Finding is a click, not a dwell. The camera no longer turns, so there is no
+ * crosshair to hold on something — and a click is what the clinical task
+ * actually is: cancellation asks the patient to mark every target they can
+ * see on a fixed sheet, and scores the ones left unmarked. Same shape here.
+ */
+export default function Scene({
+  scene, neglect, found, unseen, onFind, onWorldReady,
+  reveal = false, dissolve = false,
+}) {
   const { camera } = useThree();
-  const dwell = useRef({ id: null, ms: 0 });
-  const ray = useMemo(() => new THREE.Raycaster(), []);
-  const centre = useMemo(() => new THREE.Vector2(0, 0), []);
   const groupRef = useRef();
   const gridRef = useRef();
   const [restY, setRestY] = useState({});
@@ -44,16 +52,30 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false, di
     if (gridRef.current)
       gridRef.current.material.opacity +=
         ((dissolve ? 0.34 : 0) - gridRef.current.material.opacity) * Math.min(1, dt * 1.6);
-
-    if (!scene || reveal) return;
-    ray.setFromCamera(centre, camera);
-    const hits = groupRef.current ? ray.intersectObjects(groupRef.current.children, true) : [];
-    const hitId = hits.length ? resolveTargetId(hits[0].object) : null;
-    if (!hitId || found.has(hitId) || hidden.has(hitId)) { dwell.current = { id: null, ms: 0 }; return; }
-    if (dwell.current.id !== hitId) dwell.current = { id: hitId, ms: 0 };
-    dwell.current.ms += dt * 1000;
-    if (dwell.current.ms >= dwellMs()) { dwell.current = { id: null, ms: 0 }; onFind(hitId); }
   });
+
+  /**
+   * A click only registers on something that reached awareness.
+   *
+   * The threshold is deliberately below where a faded object is still clearly
+   * legible on screen, so nobody ends up aiming at something they can plainly
+   * see and having it refuse to respond — neglect.js is explicit that this
+   * reads as a broken interface rather than as neglect. In round two the
+   * left-side objects sit far enough out that their weight is well under this.
+   */
+  const handleDown = (e) => {
+    if (reveal) return;
+    const id = resolveTargetId(e.object);
+    if (!id || found.has(id)) return;
+    const t = scene.targets.find((x) => x.id === id);
+    if (!t) return;
+    const pos = new THREE.Vector3(
+      t.position[0], restY[t.id] ?? t.position[1], t.position[2],
+    );
+    if (attentionWeight(pos, camera, neglect) < 0.3) return;
+    e.stopPropagation();
+    onFind(id);
+  };
 
   if (!scene) return null;
   const hasWorld = !!scene.world?.splatUrl;
@@ -65,7 +87,8 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false, di
 
       <Suspense fallback={null}>
         {hasWorld
-          ? <MintWorld world={scene.world} dissolve={dissolve} onColliderReady={dropOntoSurfaces} />
+          ? <MintWorld world={scene.world} dissolve={dissolve}
+              onColliderReady={dropOntoSurfaces} onReady={onWorldReady} />
           : <GreyRoom dissolve={dissolve} />}
       </Suspense>
 
@@ -74,7 +97,7 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false, di
         <meshBasicMaterial transparent opacity={0} />
       </gridHelper>
 
-      <group ref={groupRef}>
+      <group ref={groupRef} onPointerDown={handleDown}>
         <Suspense fallback={null}>
           {scene.targets.map((t) => (
             <Target
@@ -82,7 +105,8 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false, di
               target={restY[t.id] !== undefined
                 ? { ...t, position: [t.position[0], restY[t.id], t.position[2]] }
                 : t}
-              state={found.has(t.id) ? "found" : hidden.has(t.id) ? "unseen" : "missed"}
+              state={found.has(t.id) ? "found" : unseen?.has(t.id) ? "unseen" : "missed"}
+              neglect={neglect}
               reveal={reveal}
             />
           ))}

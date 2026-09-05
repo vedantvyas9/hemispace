@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { SparkRenderer, SplatFileType, SplatMesh } from "@sparkjsdev/spark";
+import { attentionWeight } from "./neglect";
 
 // Mint GLBs may use KHR_draco_mesh_compression; one shared decoder for every load.
 useGLTF.setDecoderPath("https://cdn.mint.gg/runtime/draco/gltf/three-0.184.0/");
@@ -25,7 +26,7 @@ const DEFAULT_TRANSFORM = {
  * a Marble world is captured around eye height and falls apart when viewed
  * from far outside that volume, so the camera never sees it from above.
  */
-export function MintWorld({ world, dissolve, onColliderReady }) {
+export function MintWorld({ world, dissolve, onColliderReady, onReady }) {
   const { gl } = useThree();
   const spark = useMemo(() => new SparkRenderer({ renderer: gl }), [gl]);
   const splat = useMemo(
@@ -34,6 +35,7 @@ export function MintWorld({ world, dissolve, onColliderReady }) {
   );
   const { scene: colliderScene } = useGLTF(world.colliderUrl);
   const opacity = useRef(1);
+  const ready = useRef({ last: -1, peak: 0, settled: 0, waited: 0, done: false });
 
   useEffect(() => {
     colliderScene.traverse((o) => { o.visible = false; });
@@ -47,6 +49,35 @@ export function MintWorld({ world, dissolve, onColliderReady }) {
     if (splat) {
       splat.opacity = opacity.current;
       splat.visible = opacity.current > 0.02;
+    }
+
+    /**
+     * When the room is actually on screen.
+     *
+     * `splat.initialized` is no good for this: it resolves once the mesh
+     * exists, which happens long before any pixels arrive, and the round used
+     * to start against a black room with the clock already running.
+     *
+     * A paged .rad has no "fully loaded" either — Spark fetches chunks for
+     * whatever the camera can see. But this camera never moves, so the honest
+     * signal is that paging has *settled*: splats are on screen and the count
+     * has stopped climbing. The timeout is a floor, not a target — a demo that
+     * refuses to start is worse than one that starts a little early.
+     */
+    const r = ready.current;
+    if (r.done) return;
+    r.waited += dt;
+    const n = splat.paged?.getNumSplats?.() ?? splat.paged?.numSplats
+           ?? splat.packedSplats?.numSplats ?? 0;
+    r.peak = Math.max(r.peak, n);
+    r.settled = n > 0 && n === r.last ? r.settled + dt : 0;
+    r.last = n;
+    // Chunks arrive in bursts with gaps between them, so a short settle window
+    // fires on the first page and hands over a room that is still black. Wait
+    // long enough to be past a gap, not just inside one.
+    if ((n > 0 && r.settled > 2.0) || r.waited > 30) {
+      r.done = true;
+      onReady?.();
     }
   });
 
@@ -107,10 +138,14 @@ function Glow({ state, reveal, y, radius }) {
   useFrame((_, dt) => {
     if (!ref.current) return;
     const m = ref.current.material;
+    // Nothing glows while the search is on. A permanent marker on every object
+    // turns a cancellation task into "click the orange blobs" — the work is
+    // meant to be finding the object itself. The glow is confirmation once
+    // something is caught, and the reveal's way of pointing at what was not.
     let want = 0;
     if (state === "found") want = 0.95;
     else if (state === "unseen") { if (reveal) { t.current = Math.min(1, t.current + dt / 1.4); want = 0.85 * t.current; } }
-    else want = reveal ? 0.5 : 0.28;
+    else want = reveal ? 0.5 : 0;
     m.emissiveIntensity += (want - m.emissiveIntensity) * Math.min(1, dt * 5);
     const c = state === "found" ? "#4ea87a" : state === "unseen" ? "#e0703c" : "#ffb26b";
     m.color.lerp(new THREE.Color(c), Math.min(1, dt * 5));
@@ -119,7 +154,7 @@ function Glow({ state, reveal, y, radius }) {
     ref.current.children[0] && (ref.current.children[0].intensity = m.emissiveIntensity * 2.2);
   });
   return (
-    <mesh ref={ref} position={[0, y, 0]}>
+    <mesh ref={ref} position={[0, y, 0]} userData={{ glow: true }}>
       <sphereGeometry args={[radius, 16, 16]} />
       <meshStandardMaterial color="#ffb26b" emissive="#ffb26b" emissiveIntensity={0} transparent opacity={0.9} />
       <pointLight color="#ffb26b" intensity={0} distance={3} />
@@ -127,18 +162,46 @@ function Glow({ state, reveal, y, radius }) {
   );
 }
 
-function Model({ target, state, reveal }) {
+function Model({ target, state, reveal, neglect }) {
   const { scene } = useGLTF(target.url);
-  const cloned = useMemo(() => scene.clone(true), [scene]);
+  const { camera } = useThree();
+  const worldPos = useMemo(
+    () => new THREE.Vector3(target.position[0], target.position[1], target.position[2]),
+    [target.position],
+  );
+  // Materials are shared across clones by default, so two instances of the
+  // same GLB would fade as one. Each target owns its own copies.
+  const cloned = useMemo(() => {
+    const c = scene.clone(true);
+    c.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = Array.isArray(o.material)
+        ? o.material.map((m) => m.clone())
+        : o.material.clone();
+      for (const m of [].concat(o.material)) m.transparent = true;
+    });
+    return c;
+  }, [scene]);
   const groupRef = useRef();
+  const shown = useRef(1);
   const scale = target.scale ?? 1;
+
   useFrame((_, dt) => {
     if (!groupRef.current) return;
-    const hidden = state === "unseen" && !reveal;
-    groupRef.current.visible = !hidden;
+    // Graded, never clipped. neglect.js is explicit about why: a hard boundary
+    // models hemianopia, a field cut, which is a different condition — and the
+    // 2007 JNER occlusion simulation failed validation for exactly that.
+    const want = reveal ? 1 : attentionWeight(worldPos, camera, neglect);
+    shown.current += (want - shown.current) * Math.min(1, dt * 4);
+    groupRef.current.visible = shown.current > 0.015;
+    groupRef.current.traverse((o) => {
+      if (!o.isMesh || o.userData.glow) return;
+      for (const m of [].concat(o.material)) m.opacity = shown.current;
+    });
     if (reveal && state === "unseen")
       groupRef.current.position.y = Math.sin(performance.now() / 400) * 0.05;
   });
+
   return (
     <group ref={groupRef}>
       <group scale={scale}><primitive object={cloned} /></group>
@@ -186,14 +249,14 @@ class ModelBoundary extends Component {
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-export function Target({ target, state, reveal }) {
+export function Target({ target, state, reveal, neglect }) {
   const box = <Box target={target} state={state} reveal={reveal} />;
   return (
     <group position={target.position} userData={{ id: target.id }}>
       {target.url ? (
         <ModelBoundary url={target.url} fallback={box}>
           <Suspense fallback={box}>
-            <Model target={target} state={state} reveal={reveal} />
+            <Model target={target} state={state} reveal={reveal} neglect={neglect} />
           </Suspense>
         </ModelBoundary>
       ) : box}

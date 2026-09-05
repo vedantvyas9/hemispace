@@ -22,8 +22,8 @@ export default function App() {
             <span className="tag">For everyone</span>
             <h2>See it happen</h2>
             <p>
-              Search a room twice. The second time, half of it is not part of your world.
-              Then the camera lifts and shows you what you walked past.
+              Look at one room twice and click everything you see. The second time, half
+              your field is not part of your world — and you will not notice.
             </p>
             <span className="go">Start →</span>
           </button>

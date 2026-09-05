@@ -2,13 +2,44 @@ import { useRef, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
-/** Lifts the camera out of the participant's head and up over the room. */
-export function RevealCamera({ from, active }) {
+/**
+ * Lifts the camera out of the participant's head and back over the objects.
+ *
+ * The framing is derived from where the targets actually are rather than
+ * hardcoded. A fixed [0, 17, 8] was tuned for an older layout spread over ten
+ * metres; against a single field of view everything sits within about four,
+ * and the objects came out as nine-pixel specks in the middle of an empty
+ * grid — which is fatal, because the whole point of this shot is seeing the
+ * ones on the left light up.
+ *
+ * It pulls back along the line from the cluster through where the participant
+ * stood, so their left is still screen-left and they can recognise the scene
+ * they were just looking at.
+ */
+export function RevealCamera({ active, targets, spawn }) {
   const { camera } = useThree();
   const t = useRef(0);
   const start = useRef(null);
-  const target = useMemo(() => new THREE.Vector3(0, 17, 8), []);
-  const lookAt = useMemo(() => new THREE.Vector3(0, 0, -2.5), []);
+
+  const { target, lookAt } = useMemo(() => {
+    const pts = (targets ?? []).map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+    if (!pts.length)
+      return { target: new THREE.Vector3(0, 5, -4), lookAt: new THREE.Vector3(0, 0.5, 0) };
+
+    const box = new THREE.Box3().setFromPoints(pts);
+    const centre = box.getCenter(new THREE.Vector3());
+    const spread = Math.max(box.getSize(new THREE.Vector3()).length(), 1.5);
+    const eye = new THREE.Vector3(spawn?.position?.[0] ?? 0, 0, spawn?.position?.[2] ?? 0);
+    const back = new THREE.Vector3().subVectors(eye, centre);
+    back.y = 0;
+    if (back.lengthSq() < 1e-4) back.set(0, 0, -1);
+    back.normalize().multiplyScalar(spread * 0.75);
+
+    return {
+      target: new THREE.Vector3(centre.x + back.x, centre.y + spread * 0.85, centre.z + back.z),
+      lookAt: centre.clone(),
+    };
+  }, [targets, spawn]);
 
   useFrame((_, dt) => {
     if (!active) return;

@@ -1,57 +1,69 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import FirstPerson from "./FirstPerson";
+import FixedCamera from "./FixedCamera";
 import Scene from "./Scene";
-import { RevealCamera, GazeFan } from "./Reveal3D";
+import { RevealCamera } from "./Reveal3D";
 import BrainPanel from "./BrainPanel";
-import { DEFAULTS, meanGazeDeg, leftDwellFraction, YAW_LIMITS } from "./neglect";
+import { DEFAULTS } from "./neglect";
 
-const SECONDS = 25;
+const SECONDS = 20;
 const CLEAN = { ...DEFAULTS, enabled: false };
+const NEGLECT = { ...DEFAULTS, enabled: true };
 const EMPTY = new Set();
+
+/**
+ * Where a target sits in the participant's field, in degrees, negative left.
+ *
+ * The camera never moves, so this is fixed data and can be worked out from
+ * scene.json alone. It replaces the old `position[0] < 0` test, which asked
+ * which half of the *world* something was in — fine only while the spawn
+ * happened to face -z. What matters clinically is which half of the *field*
+ * it falls in, so that is what gets measured.
+ */
+function fieldAzimuth(target, spawn) {
+  const p = spawn?.position ?? [0, 1.6, 0];
+  const dx = target.position[0] - p[0];
+  const dz = target.position[2] - p[2];
+  const world = (Math.atan2(dx, -dz) * 180) / Math.PI;
+  const yaw = ((spawn?.yaw ?? 0) * 180) / Math.PI;
+  let a = world + yaw;
+  while (a > 180) a -= 360;
+  while (a < -180) a += 360;
+  return a;
+}
 
 export default function Experience({ onExit }) {
   const [scene, setScene] = useState(null);
   const [phase, setPhase] = useState("intro");   // intro | run | declare | intro2 | reveal
   const [round, setRound] = useState(1);
   const [found, setFound] = useState(new Set());
-  const [poses, setPoses] = useState([]);
   const [left, setLeft] = useState(SECONDS);
-  const [locked, setLocked] = useState(false);
   const [results, setResults] = useState([]);
   const [revealStep, setRevealStep] = useState(0);
-  const canvasRef = useRef(null);
+  const [worldReady, setWorldReady] = useState(false);
+  const timerRef = useRef(null);
 
   useEffect(() => { fetch("/scene.json").then((r) => r.json()).then(setScene); }, []);
 
-  // Round two: the left half of the room is simply not part of their world.
-  const hidden = (round === 2 && scene && phase !== "reveal")
-    ? new Set(scene.targets.filter((t) => t.position[0] < 0).map((t) => t.id))
-    : EMPTY;
+  const neglect = round === 2 && phase !== "reveal" ? NEGLECT : CLEAN;
+
+  // The left half of the field, which round two never brings to awareness.
+  const unseen = useMemo(() => {
+    if (!scene || round !== 2) return EMPTY;
+    return new Set(
+      scene.targets
+        .filter((t) => fieldAzimuth(t, scene.spawn) < 0)
+        .map((t) => t.id),
+    );
+  }, [scene, round]);
 
   useEffect(() => {
-    const onChange = () => setLocked(!!document.pointerLockElement);
-    document.addEventListener("pointerlockchange", onChange);
-    return () => document.removeEventListener("pointerlockchange", onChange);
-  }, []);
-
-  function grabPointer() {
-    const el = canvasRef.current;
-    if (!el || document.pointerLockElement === el) return;
-    try {
-      const r = el.requestPointerLock?.();
-      if (r && r.catch) r.catch(() => setTimeout(() => el.requestPointerLock?.(), 400));
-    } catch { setTimeout(() => el.requestPointerLock?.(), 400); }
-  }
-  useEffect(() => { if (phase !== "run") document.exitPointerLock?.(); }, [phase]);
-
-  useEffect(() => {
-    if (phase !== "run" || !locked) return;
-    const id = setInterval(() => {
-      setLeft((s) => { if (s <= 1) { clearInterval(id); endRun(); return 0; } return s - 1; });
+    if (phase !== "run") return;
+    timerRef.current = setInterval(() => {
+      setLeft((s) => { if (s <= 1) { clearInterval(timerRef.current); endRun(); return 0; } return s - 1; });
     }, 1000);
-    return () => clearInterval(id);
-  }, [phase, locked]);
+    return () => clearInterval(timerRef.current);
+  }, [phase]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -64,89 +76,97 @@ export default function Experience({ onExit }) {
   // Staged reveal so the audience gets one idea at a time.
   useEffect(() => {
     if (phase !== "reveal") return;
+    // Step 2 is the whole point — the missed objects lighting up — so it gets
+    // room to land instead of the 3.2s it had.
     const ts = [
-      setTimeout(() => setRevealStep(1), 2800),   // camera has landed, room gone
-      setTimeout(() => setRevealStep(2), 5000),   // where they looked
-      setTimeout(() => setRevealStep(3), 7200),   // what was there all along
-      setTimeout(() => setRevealStep(4), 10400),  // why
+      setTimeout(() => setRevealStep(1), 2800),
+      setTimeout(() => setRevealStep(2), 5400),
+      setTimeout(() => setRevealStep(3), 13500),
     ];
     return () => ts.forEach(clearTimeout);
   }, [phase]);
 
-  function startRun() { setFound(new Set()); setPoses([]); setLeft(SECONDS); setPhase("run"); }
-  function endRun() { document.exitPointerLock?.(); setPhase("declare"); }
+  function startRun() { setFound(new Set()); setLeft(SECONDS); setPhase("run"); }
+  function endRun() { clearInterval(timerRef.current); setPhase("declare"); }
 
   function next() {
-    const visible = scene.targets.length - hidden.size;
+    const reachable = scene.targets.length - unseen.size;
     setResults((r) => [...r, {
-      round, found: found.size, visible, total: scene.targets.length,
-      gaze: meanGazeDeg(poses), leftPct: leftDwellFraction(poses) * 100,
-      poses: poses.slice(),
+      round, found: found.size, reachable, total: scene.targets.length,
+      missed: scene.targets.filter((t) => !found.has(t.id)).map((t) => t.id),
     }]);
     if (round === 1) { setRound(2); setPhase("intro2"); }
     else { setRevealStep(0); setPhase("reveal"); }
   }
 
   const r1 = results[0], r2 = results[1];
+  const leftCount = unseen.size;
+
+  /**
+   * Where their attention actually landed, in degrees of visual field.
+   *
+   * There is no gaze to measure any more — the camera never moves — so the
+   * old mean-gaze figure would have been invented. This is the same thing the
+   * clinical version scores: the spatial centre of the targets they marked.
+   * Mark only the right-hand ones and it sits well to the right, which is the
+   * claim the panel underneath it is making.
+   */
+  const attentionDeg = useMemo(() => {
+    if (!scene || !r2) return 0;
+    const hit = scene.targets.filter((t) => !r2.missed.includes(t.id));
+    const pool = hit.length ? hit : scene.targets.filter((t) => !unseen.has(t.id));
+    if (!pool.length) return 0;
+    return pool.reduce((a, t) => a + fieldAzimuth(t, scene.spawn), 0) / pool.length;
+  }, [scene, r2, unseen]);
 
   return (
     <div className="app">
       <Canvas
         camera={{ fov: 72, near: 0.1, far: 300 }}
-        onCreated={({ gl, scene, camera }) => {
-          canvasRef.current = gl.domElement;
-          window.__hemi = { gl, scene, camera };
-        }}
+        onCreated={({ gl, scene: s, camera }) => { window.__hemi = { gl, scene: s, camera }; }}
       >
         {scene && (
           <>
-            {phase !== "reveal" && (
-              <FirstPerson
-                spawn={scene.spawn}
-                neglect={CLEAN}
-                yawLimits={round === 2 ? YAW_LIMITS : null}
-                onPose={(p) => { if (phase === "run") setPoses((x) => [...x, p]); }}
-              />
-            )}
-            <RevealCamera active={phase === "reveal"} />
+            {phase !== "reveal" && <FixedCamera spawn={scene.spawn} />}
+            <RevealCamera
+              active={phase === "reveal"}
+              targets={scene.targets.map((t) => t.position)}
+              spawn={scene.spawn}
+            />
             <Scene
               scene={scene}
-              hidden={hidden}
+              neglect={neglect}
               found={found}
+              unseen={phase === "reveal" ? unseen : EMPTY}
               onFind={(id) => setFound((prev) => { const n = new Set(prev); n.add(id); return n; })}
-              reveal={phase === "reveal" && revealStep >= 3}
+              onWorldReady={() => setWorldReady(true)}
+              reveal={phase === "reveal" && revealStep >= 2}
               dissolve={phase === "reveal"}
             />
-            {phase === "reveal" && revealStep >= 2 && r2 && (
-              <GazeFan poses={r2.poses} />
-            )}
           </>
         )}
       </Canvas>
 
-      {phase === "run" && !locked && (
-        <div className="overlay grab" onClick={grabPointer}>
-          <h2>Click to look around</h2><p>The timer is paused until you do.</p>
-        </div>
-      )}
-
-      {phase === "run" && locked && (
+      {phase === "run" && (
         <>
-          <div className="crosshair" />
           <div className="hud">
-            <span className={left <= 8 ? "urgent" : ""}>{left}s</span>
+            <span className={left <= 6 ? "urgent" : ""}>{left}s</span>
             <span className="sep" /><span>Found {found.size}</span><kbd>Enter</kbd>
           </div>
-          <div className="hint">Click to look around · WASD to walk · Enter when you're done</div>
+          <div className="hint">Click everything you can see · Enter when you're done</div>
         </>
       )}
 
       {phase === "intro" && (
         <div className="overlay">
           <h1>Hemispace</h1>
-          <p>There are objects all around this room, behind you too. You have {SECONDS} seconds
-             to find as many as you can.</p>
-          <button onClick={() => { startRun(); setTimeout(grabPointer, 450); }}>Start</button>
+          <p>
+            You are standing still, looking at one room. Click every object you can
+            see. You have {SECONDS} seconds.
+          </p>
+          <button onClick={startRun} disabled={!worldReady}>
+            {worldReady ? "Start" : "Loading the room…"}
+          </button>
           <button className="link" onClick={onExit}>Back</button>
         </div>
       )}
@@ -154,8 +174,10 @@ export default function Experience({ onExit }) {
       {phase === "intro2" && (
         <div className="overlay">
           <h2>Found {r1?.found} of {r1?.total}</h2>
-          <p>Once more, a different room. Same {SECONDS} seconds.</p>
-          <button onClick={() => { startRun(); setTimeout(grabPointer, 450); }}>Go</button>
+          <p>Same room, same view, same {SECONDS} seconds. Once more.</p>
+          <button onClick={startRun} disabled={!worldReady}>
+            {worldReady ? "Go" : "Loading the room…"}
+          </button>
         </div>
       )}
 
@@ -170,32 +192,30 @@ export default function Experience({ onExit }) {
       {phase === "reveal" && (
         <div className="reveal-ui">
           {revealStep === 0 && <div className="cap"><h2>Let's look at that room again.</h2></div>}
-          {revealStep === 1 && <div className="cap"><h2>You found {r2?.found}. You were sure that was all of them.</h2></div>}
-          {revealStep === 2 && (
+          {revealStep === 1 && (
             <div className="cap">
-              <h2>Here is where you looked.</h2>
-              <p>You spent {r2?.leftPct.toFixed(0)}% of your time facing the left half of the room.</p>
+              <h2>You found {r2?.found}. You were sure that was all of them.</h2>
             </div>
           )}
-          {revealStep === 3 && (
+          {revealStep === 2 && (
             <div className="cap">
               <h2>These were there the whole time.</h2>
               <p>
-                Nothing was hidden and nothing was dark. For {SECONDS} seconds the left half
-                of this room was not part of your world — and you never once wondered
-                what was over there.
+                {leftCount} object{leftCount === 1 ? "" : "s"} on the left of your view.
+                Nothing moved and nothing was dark — you never turned your head, because
+                there was nothing to turn towards. They simply never reached you.
               </p>
             </div>
           )}
-          {revealStep >= 4 && (
+          {revealStep >= 3 && (
             <div className="cap final">
-              <BrainPanel meanGazeDeg={r2?.gaze ?? 0} />
+              <BrainPanel meanGazeDeg={attentionDeg} />
               <h2>Why it happens</h2>
               <p>
                 Your two hemispheres normally push attention in opposite directions and
                 cancel each other out. Damage the right one and the left keeps pushing
                 rightward with nothing to oppose it. Attention settles to the right and
-                stays there — which is where your own gaze ended up.
+                stays there.
               </p>
               <p className="small">
                 Schematic, not anatomy. Hemispatial neglect affects around 60% of patients
