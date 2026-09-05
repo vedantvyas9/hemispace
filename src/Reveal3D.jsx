@@ -7,8 +7,8 @@ export function RevealCamera({ from, active }) {
   const { camera } = useThree();
   const t = useRef(0);
   const start = useRef(null);
-  const target = useMemo(() => new THREE.Vector3(0, 26, 9), []);
-  const lookAt = useMemo(() => new THREE.Vector3(0, 0, -3.5), []);
+  const target = useMemo(() => new THREE.Vector3(0, 17, 8), []);
+  const lookAt = useMemo(() => new THREE.Vector3(0, 0, -2.5), []);
 
   useFrame((_, dt) => {
     if (!active) return;
@@ -32,7 +32,7 @@ export function RevealCamera({ from, active }) {
  * Each wedge is 6 degrees of heading; its opacity is how long they spent
  * facing that way. The gap is the argument.
  */
-export function GazeFan({ poses, origin = [0, 0.06, 0], radius = 13 }) {
+export function GazeFan({ poses, origin = [0, 0.06, 0], radius = 8 }) {
   const geo = useMemo(() => {
     const BINS = 60, bin = new Array(BINS).fill(0);
     for (let i = 1; i < poses.length; i++) {
