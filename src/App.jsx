@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import FirstPerson from "./FirstPerson";
 import Scene from "./Scene";
 import { RevealCamera, GazeFan } from "./Reveal3D";
+import BrainPanel from "./BrainPanel";
 import { DEFAULTS, meanGazeDeg, leftDwellFraction } from "./neglect";
 
 const SECONDS = 25;
@@ -63,10 +64,13 @@ export default function App() {
   // Staged reveal so the audience gets one idea at a time.
   useEffect(() => {
     if (phase !== "reveal") return;
-    const a = setTimeout(() => setRevealStep(1), 2600);   // camera has landed
-    const b = setTimeout(() => setRevealStep(2), 4600);   // gaze fan
-    const c = setTimeout(() => setRevealStep(3), 6600);   // the missing objects
-    return () => [a, b, c].forEach(clearTimeout);
+    const ts = [
+      setTimeout(() => setRevealStep(1), 2800),   // camera has landed, room gone
+      setTimeout(() => setRevealStep(2), 5000),   // where they looked
+      setTimeout(() => setRevealStep(3), 7200),   // what was there all along
+      setTimeout(() => setRevealStep(4), 10400),  // why
+    ];
+    return () => ts.forEach(clearTimeout);
   }, [phase]);
 
   function startRun() { setFound(new Set()); setPoses([]); setLeft(SECONDS); setPhase("run"); }
@@ -107,6 +111,7 @@ export default function App() {
               found={found}
               onFind={(id) => setFound((prev) => { const n = new Set(prev); n.add(id); return n; })}
               reveal={phase === "reveal" && revealStep >= 3}
+              dissolve={phase === "reveal"}
             />
             {phase === "reveal" && revealStep >= 2 && r2 && (
               <GazeFan poses={r2.poses} />
@@ -167,18 +172,30 @@ export default function App() {
               <p>You spent {r2?.leftPct.toFixed(0)}% of your time facing the left half of the room.</p>
             </div>
           )}
-          {revealStep >= 3 && (
-            <div className="cap final">
+          {revealStep === 3 && (
+            <div className="cap">
               <h2>These were there the whole time.</h2>
               <p>
                 Nothing was hidden and nothing was dark. For {SECONDS} seconds the left half
                 of this room was not part of your world — and you never once wondered
                 what was over there.
               </p>
+            </div>
+          )}
+          {revealStep >= 4 && (
+            <div className="cap final">
+              <BrainPanel meanGazeDeg={r2?.gaze ?? 0} />
+              <h2>Why it happens</h2>
+              <p>
+                Your two hemispheres normally push attention in opposite directions and
+                cancel each other out. Damage the right one and the left keeps pushing
+                rightward with nothing to oppose it. Attention settles to the right and
+                stays there — which is where your own gaze ended up.
+              </p>
               <p className="small">
-                This is hemispatial neglect. It affects around 60% of patients in the first
-                weeks after a right-hemisphere stroke, and roughly one in twelve never
-                recovers from it. They are not blind. Nobody has told them.
+                Schematic, not anatomy. Hemispatial neglect affects around 60% of patients
+                in the first weeks after a right-hemisphere stroke, and roughly one in
+                twelve never recovers. They are not blind. Nobody has told them.
               </p>
               <button onClick={() => { setResults([]); setRound(1); setRevealStep(0); setPhase("intro"); }}>
                 Run it again

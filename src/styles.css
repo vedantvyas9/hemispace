@@ -109,3 +109,6 @@ code { font-family: ui-monospace, monospace; background: #21262d; padding: 1px 6
 .cap button { margin-top: 14px; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .cap { animation: none; } }
+
+.cap.final { max-width: 68ch; }
+.brain { width: 100%; max-width: 520px; height: auto; margin: 0 auto 14px; display: block; }

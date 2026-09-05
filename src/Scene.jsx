@@ -3,17 +3,53 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { dwellMs } from "./neglect";
 
-function Room() {
+/**
+ * The room dissolves during the reveal. This is a narrative choice as much as
+ * a practical one: a Gaussian splat world from World Labs is captured from
+ * roughly eye height and falls apart when viewed from far outside that
+ * volume, so flying a camera 26m above it would show artefacts and holes.
+ * Fading it out instead turns that constraint into the transition — you leave
+ * the person's world and enter the data — and the gaze fan reads far better
+ * against a clean ground than against a photographed floor.
+ */
+function Room({ dissolve }) {
+  const walls = useRef([]);
+  const floorRef = useRef();
+  const gridRef = useRef();
+
+  useFrame((_, dt) => {
+    const k = Math.min(1, dt * 1.6);
+    walls.current.forEach((m) => {
+      if (!m) return;
+      m.material.opacity += ((dissolve ? 0 : 1) - m.material.opacity) * k;
+      m.visible = m.material.opacity > 0.01;
+    });
+    if (floorRef.current)
+      floorRef.current.material.opacity += ((dissolve ? 0.25 : 1) - floorRef.current.material.opacity) * k;
+    if (gridRef.current)
+      gridRef.current.material.opacity += ((dissolve ? 0.32 : 0) - gridRef.current.material.opacity) * k;
+  });
+
+  const wall = (i, pos, args, color) => (
+    <mesh key={i} ref={(el) => (walls.current[i] = el)} position={pos}>
+      <boxGeometry args={args} />
+      <meshStandardMaterial color={color} transparent opacity={1} />
+    </mesh>
+  );
+
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -4]} receiveShadow>
+      <mesh ref={floorRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -4]} receiveShadow>
         <planeGeometry args={[24, 24]} />
-        <meshStandardMaterial color="#3a4048" />
+        <meshStandardMaterial color="#3a4048" transparent opacity={1} />
       </mesh>
-      <mesh position={[0, 3, -16]}><boxGeometry args={[24, 6, 0.2]} /><meshStandardMaterial color="#2c323a" /></mesh>
-      <mesh position={[0, 3, 8]}><boxGeometry args={[24, 6, 0.2]} /><meshStandardMaterial color="#2f353d" /></mesh>
-      <mesh position={[-12, 3, -4]}><boxGeometry args={[0.2, 6, 24]} /><meshStandardMaterial color="#333941" /></mesh>
-      <mesh position={[12, 3, -4]}><boxGeometry args={[0.2, 6, 24]} /><meshStandardMaterial color="#333941" /></mesh>
+      <gridHelper ref={gridRef} args={[24, 24, "#4a6f88", "#2c3b47"]} position={[0, 0.02, -4]}>
+        <meshBasicMaterial transparent opacity={0} />
+      </gridHelper>
+      {wall(0, [0, 3, -16], [24, 6, 0.2], "#2c323a")}
+      {wall(1, [0, 3, 8], [24, 6, 0.2], "#2f353d")}
+      {wall(2, [-12, 3, -4], [0.2, 6, 24], "#333941")}
+      {wall(3, [12, 3, -4], [0.2, 6, 24], "#333941")}
     </group>
   );
 }
@@ -49,7 +85,7 @@ function Target({ target, state, reveal }) {
   );
 }
 
-export default function Scene({ scene, hidden, found, onFind, reveal = false }) {
+export default function Scene({ scene, hidden, found, onFind, reveal = false, dissolve = false }) {
   const { camera } = useThree();
   const dwell = useRef({ id: null, ms: 0 });
   const ray = useMemo(() => new THREE.Raycaster(), []);
@@ -72,7 +108,7 @@ export default function Scene({ scene, hidden, found, onFind, reveal = false }) 
     <group>
       <ambientLight intensity={0.62} />
       <directionalLight position={[4, 10, 2]} intensity={1.1} />
-      <Room />
+      <Room dissolve={dissolve} />
       <group ref={groupRef}>
         {scene.targets.map((t) => {
           const state = found.has(t.id) ? "found" : hidden.has(t.id) ? "unseen" : "missed";
