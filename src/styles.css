@@ -241,24 +241,37 @@ button.link:hover { background: none; color: #a3b1c0; }
    Stripes rather than a flat wash so it reads as "not processed" instead of
    "dimmed", and a gradient rather than an edge because attention falls away
    gradually — a hard boundary would be a field cut, which is a different
-   condition entirely. It fades out around a third of the way across, which is
-   roughly where the attention weight passes a half. */
+   condition entirely. Strong enough to be unmissable, still transparent
+   enough that you can plainly see what is underneath, because being able to
+   see it and still not registering it is the entire point. */
 .neglect-veil {
-  position: fixed; inset: 0 auto 0 0; width: 52%;
+  position: fixed; inset: 0 auto 0 0; width: 56%;
   pointer-events: none; z-index: 3;
   background:
     repeating-linear-gradient(
       -52deg,
-      rgba(120, 150, 190, .24) 0px, rgba(120, 150, 190, .24) 3px,
-      rgba(0, 0, 0, 0) 3px, rgba(0, 0, 0, 0) 11px
+      rgba(150, 185, 230, .42) 0px, rgba(150, 185, 230, .42) 4px,
+      rgba(0, 0, 0, 0) 4px, rgba(0, 0, 0, 0) 13px
     ),
-    linear-gradient(to right, rgba(10, 14, 20, .50), rgba(10, 14, 20, 0));
-  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 34%, transparent 96%);
-  mask-image: linear-gradient(to right, #000 0%, #000 34%, transparent 96%);
+    linear-gradient(to right, rgba(8, 12, 18, .62), rgba(8, 12, 18, .10));
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 52%, transparent 99%);
+  mask-image: linear-gradient(to right, #000 0%, #000 52%, transparent 99%);
 }
+
+/* Said once, large, on the side it is talking about. */
 .veil-note {
-  position: fixed; left: 22px; top: 50%; transform: translateY(-50%);
-  z-index: 4; pointer-events: none;
-  font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-  color: #8fa6c0; opacity: .9; writing-mode: vertical-rl; rotate: 180deg;
+  position: fixed; left: 0; top: 50%; transform: translateY(-50%);
+  width: 50%; padding: 0 4vw; box-sizing: border-box;
+  z-index: 4; pointer-events: none; text-align: left;
 }
+.veil-note b {
+  display: block; font-size: clamp(26px, 3.4vw, 46px); line-height: 1.02;
+  font-weight: 700; letter-spacing: -.02em; color: #eaf1f8;
+  text-shadow: 0 2px 18px rgba(0,0,0,.85), 0 0 40px rgba(0,0,0,.6);
+}
+.veil-note span {
+  display: block; margin-top: 10px; max-width: 34ch;
+  font-size: clamp(13px, 1.15vw, 17px); line-height: 1.4; color: #c3d2e2;
+  text-shadow: 0 2px 14px rgba(0,0,0,.9);
+}
+

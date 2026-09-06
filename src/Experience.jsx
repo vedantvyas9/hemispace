@@ -192,7 +192,10 @@ export default function Experience({ onExit }) {
       {phase === "run" && (
         <>
           {round === 2 && (
-            <div className="veil-note">Your left — seen, but not attended</div>
+            <div className="veil-note" aria-live="polite">
+              <b>You can see this half.</b>
+              <span>Your brain cannot attend to it. Nothing under the stripes will register.</span>
+            </div>
           )}
           <div className="hud">
             <span className={left <= 6 ? "urgent" : ""}>{left}s</span>
