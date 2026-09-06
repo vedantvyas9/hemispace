@@ -35,7 +35,8 @@
         2.42
       ],
       "scale": 0.16,
-      "fieldDeg": 15
+      "fieldDeg": 15,
+      "label": "a wooden toy block"
     },
     {
       "id": "R2",
@@ -46,7 +47,8 @@
         3.25
       ],
       "scale": 0.35,
-      "fieldDeg": 30
+      "fieldDeg": 30,
+      "label": "a desk lamp"
     },
     {
       "id": "R3",
@@ -57,7 +59,8 @@
         2.49
       ],
       "scale": 0.18,
-      "fieldDeg": 40
+      "fieldDeg": 40,
+      "label": "a small potted plant"
     },
     {
       "id": "R4",
@@ -68,7 +71,8 @@
         1.93
       ],
       "scale": 0.16,
-      "fieldDeg": 50
+      "fieldDeg": 50,
+      "label": "a red apple"
     },
     {
       "id": "L1",
@@ -79,7 +83,8 @@
         1.15
       ],
       "scale": 0.28,
-      "fieldDeg": -40
+      "fieldDeg": -40,
+      "label": "a hardback book"
     },
     {
       "id": "L2",
@@ -90,7 +95,8 @@
         0.82
       ],
       "scale": 0.16,
-      "fieldDeg": -35
+      "fieldDeg": -35,
+      "label": "a dark mug"
     }
   ]
 }

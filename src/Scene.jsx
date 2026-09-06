@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { attentionWeight } from "./neglect";
@@ -63,6 +63,32 @@ export default function Scene({
    * reads as a broken interface rather than as neglect. In round two the
    * left-side objects sit far enough out that their weight is well under this.
    */
+  const [hover, setHover] = useState(null);
+
+  /** Attention gate, shared by hovering and clicking. */
+  const reaches = useCallback((id) => {
+    const t = scene?.targets.find((x) => x.id === id);
+    if (!t) return false;
+    const pos = new THREE.Vector3(t.position[0], restY[t.id] ?? t.position[1], t.position[2]);
+    return attentionWeight(pos, camera, neglect) >= 0.3;
+  }, [scene, restY, camera, neglect]);
+
+  // Without this a first-time participant cannot tell a target from the
+  // furniture — the room is full of real books and real plants. The cursor is
+  // the affordance. It is gated on attention too, so in round two the
+  // left-hand objects do not answer the pointer either.
+  useEffect(() => {
+    document.body.style.cursor = hover ? "pointer" : "";
+    return () => { document.body.style.cursor = ""; };
+  }, [hover]);
+
+  const handleOver = (e) => {
+    if (reveal) return;
+    const id = resolveTargetId(e.object);
+    if (id && !found.has(id) && reaches(id)) { e.stopPropagation(); setHover(id); }
+  };
+  const handleOut = () => setHover(null);
+
   const handleDown = (e) => {
     if (reveal) return;
     const id = resolveTargetId(e.object);
@@ -74,6 +100,7 @@ export default function Scene({
     );
     if (attentionWeight(pos, camera, neglect) < 0.3) return;
     e.stopPropagation();
+    setHover(null);
     onFind(id);
   };
 
@@ -97,7 +124,8 @@ export default function Scene({
         <meshBasicMaterial transparent opacity={0} />
       </gridHelper>
 
-      <group ref={groupRef} onPointerDown={handleDown}>
+      <group ref={groupRef} onPointerDown={handleDown}
+             onPointerOver={handleOver} onPointerOut={handleOut}>
         <Suspense fallback={null}>
           {scene.targets.map((t) => (
             <Target
@@ -107,6 +135,7 @@ export default function Scene({
                 : t}
               state={found.has(t.id) ? "found" : unseen?.has(t.id) ? "unseen" : "missed"}
               neglect={neglect}
+              hover={hover === t.id}
               reveal={reveal}
             />
           ))}

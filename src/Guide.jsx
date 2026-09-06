@@ -25,8 +25,9 @@ const STEPS = [
     ),
   },
   {
-    title: "Click everything you can see.",
-    body: "Every object you spot, click it. It turns green when it has counted. Ordinary things — a mug, a book, a plant.",
+    title: "Six things are in the room.",
+    body: "Click each one you spot. It turns green when it has counted. They are hidden in plain sight, sitting where you would actually leave them.",
+    list: true,
     art: (
       <svg viewBox="0 0 120 72" className="guide-art" aria-hidden="true">
         <circle cx="48" cy="36" r="13" fill="#1c2a22" stroke="#4ea87a" strokeWidth="1.6" />
@@ -54,7 +55,7 @@ const STEPS = [
   },
 ];
 
-export default function Guide({ seconds, ready, onStart, onExit }) {
+export default function Guide({ seconds, ready, targets, onStart, onExit }) {
   const [i, setI] = useState(0);
   const step = STEPS[i];
   const last = i === STEPS.length - 1;
@@ -65,6 +66,17 @@ export default function Guide({ seconds, ready, onStart, onExit }) {
         {step.art}
         <h2>{step.title}</h2>
         <p>{step.body.replace("Twenty seconds", `${seconds} seconds`)}</p>
+
+        {/* Named from scene.json rather than written out here, so the room and
+            the briefing cannot drift apart. Without this a first-time
+            participant has no way to tell a target from the furniture. */}
+        {step.list && targets?.length > 0 && (
+          <ul className="guide-list">
+            {targets.map((t) => (
+              <li key={t.id}>{t.label ?? "an object"}</li>
+            ))}
+          </ul>
+        )}
 
         <div className="guide-dots" role="tablist" aria-label="Steps">
           {STEPS.map((s, n) => (

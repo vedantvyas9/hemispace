@@ -183,8 +183,17 @@ export default function Experience({ onExit }) {
         )}
       </Canvas>
 
+      {/* The neglected half, drawn. Graded rather than cut off: attention falls
+          away toward the left instead of stopping at a line, and a hard edge
+          would depict hemianopia, which is a different condition. You can see
+          straight through it — that is the point. */}
+      {phase === "run" && round === 2 && <div className="neglect-veil" aria-hidden="true" />}
+
       {phase === "run" && (
         <>
+          {round === 2 && (
+            <div className="veil-note">Your left — seen, but not attended</div>
+          )}
           <div className="hud">
             <span className={left <= 6 ? "urgent" : ""}>{left}s</span>
             <span className="sep" /><span>Found {found.size}</span><kbd>Enter</kbd>
@@ -194,13 +203,23 @@ export default function Experience({ onExit }) {
       )}
 
       {phase === "intro" && (
-        <Guide seconds={SECONDS} ready={worldReady} onStart={startRun} onExit={onExit} />
+        <Guide seconds={SECONDS} ready={worldReady} targets={scene?.targets}
+               onStart={startRun} onExit={onExit} />
       )}
 
       {phase === "intro2" && (
         <div className="overlay">
           <h2>Found {r1?.found} of {r1?.total}</h2>
-          <p>Same room, same view, same {SECONDS} seconds. Once more.</p>
+          <p>
+            Now do it again as someone whose right hemisphere has been damaged
+            by a stroke. Their eyes work perfectly. What they cannot do is pay
+            attention to the left — so the left of your view is shaded, and what
+            is under the shading will not register no matter how hard you look.
+          </p>
+          <p className="small">
+            That is the difference that matters. It is not blindness. The
+            information arrives and never reaches them.
+          </p>
           <button onClick={startRun} disabled={!worldReady}>
             {worldReady ? "Go" : "Loading the room…"}
           </button>
@@ -220,7 +239,8 @@ export default function Experience({ onExit }) {
           {revealStep === 0 && <div className="cap"><h2>Let's look at that room again.</h2></div>}
           {revealStep === 1 && (
             <div className="cap">
-              <h2>You found {r2?.found}. You were sure that was all of them.</h2>
+              <h2>You found {r2?.found} of {r2?.total}.</h2>
+              <p>Every one of them on the side you could still attend to.</p>
             </div>
           )}
           {revealStep === 2 && (
@@ -228,8 +248,10 @@ export default function Experience({ onExit }) {
               <h2>These were there the whole time.</h2>
               <p>
                 {leftCount} object{leftCount === 1 ? "" : "s"} on the left of your view.
-                Nothing moved and nothing was dark — you never turned your head, because
-                there was nothing to turn towards. They simply never reached you.
+                You could see them. You were told exactly where they were. And the
+                shading still won — which is the closest this can get to what a patient
+                lives with, except that nobody hands them the shading, or tells them it
+                is there.
               </p>
             </div>
           )}

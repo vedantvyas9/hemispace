@@ -30,9 +30,10 @@ export function MintWorld({ world, dissolve, onColliderReady, onReady }) {
   const { gl } = useThree();
   const spark = useMemo(() => new SparkRenderer({ renderer: gl }), [gl]);
   // The camera is fixed, so there is no reason to spend quality on being ready
-  // to move. Spark drops detail as it pages, which is what produced the patchy,
-  // half-missing look; asking for quality and a generous LOD budget spends the
-  // headroom a static shot leaves lying around.
+  // to move. Spark drops detail as it pages, which is most of what the patchy,
+  // half-missing look was. Quality mode with a modest LOD bump buys back the
+  // detail; going further (2.5x) fetched so many chunks that the room took
+  // over a minute to settle, which is a worse problem than the one it fixed.
   const splat = useMemo(
     () => new SplatMesh({
       url: world.splatUrl,
@@ -40,19 +41,36 @@ export function MintWorld({ world, dissolve, onColliderReady, onReady }) {
       paged: true,
       raycastable: false,
       lod: "quality",
-      lodScale: 2.5,
+      lodScale: 1.5,
     }),
     [world.splatUrl],
   );
   const { scene: colliderScene } = useGLTF(world.colliderUrl);
   const opacity = useRef(1);
-  const ready = useRef({ last: -1, peak: 0, settled: 0, waited: 0, done: false });
+  const ready = useRef({ last: -1, peak: 0, settled: 0, done: false });
 
   useEffect(() => {
     colliderScene.traverse((o) => { o.visible = false; });
     onColliderReady?.(colliderScene);
   }, [colliderScene, onColliderReady]);
   useEffect(() => () => { spark.dispose?.(); splat.dispose?.(); }, [spark, splat]);
+
+  // The backstop has to be a real timer, not a frame counter. Chrome throttles
+  // requestAnimationFrame in an unfocused tab, so a useFrame budget barely
+  // advances while someone is looking at another window — and they come back to
+  // a button that still says "Loading the room…" and never stops.
+  //
+  // It also has to be armed exactly once. The callback is an inline closure at
+  // the call site, so a new identity arrives on every render; depending on it
+  // restarted the timer continuously and it never reached the end.
+  const readyCb = useRef(onReady);
+  readyCb.current = onReady;
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (!ready.current.done) { ready.current.done = true; readyCb.current?.(); }
+    }, 25000);
+    return () => clearTimeout(id);
+  }, []);
 
   useFrame((_, dt) => {
     const want = dissolve ? 0 : 1;
@@ -77,7 +95,6 @@ export function MintWorld({ world, dissolve, onColliderReady, onReady }) {
      */
     const r = ready.current;
     if (r.done) return;
-    r.waited += dt;
     const n = splat.paged?.getNumSplats?.() ?? splat.paged?.numSplats
            ?? splat.packedSplats?.numSplats ?? 0;
     r.peak = Math.max(r.peak, n);
@@ -86,9 +103,9 @@ export function MintWorld({ world, dissolve, onColliderReady, onReady }) {
     // Chunks arrive in bursts with gaps between them, so a short settle window
     // fires on the first page and hands over a room that is still black. Wait
     // long enough to be past a gap, not just inside one.
-    if ((n > 0 && r.settled > 2.0) || r.waited > 30) {
+    if (n > 0 && r.settled > 2.0) {
       r.done = true;
-      onReady?.();
+      readyCb.current?.();
     }
   });
 
@@ -143,7 +160,7 @@ export function GreyRoom({ dissolve }) {
  * model's materials — a generated GLB brings its own, and writing emissive
  * values straight onto them wrecks the asset.
  */
-function Glow({ state, reveal, y, radius }) {
+function Glow({ state, reveal, hover, y, radius }) {
   const ref = useRef();
   const t = useRef(0);
   useFrame((_, dt) => {
@@ -156,7 +173,7 @@ function Glow({ state, reveal, y, radius }) {
     let want = 0;
     if (state === "found") want = 0.95;
     else if (state === "unseen") { if (reveal) { t.current = Math.min(1, t.current + dt / 1.4); want = 0.85 * t.current; } }
-    else want = reveal ? 0.5 : 0;
+    else want = reveal ? 0.5 : hover ? 0.5 : 0;
     m.emissiveIntensity += (want - m.emissiveIntensity) * Math.min(1, dt * 5);
     const c = state === "found" ? "#4ea87a" : state === "unseen" ? "#e0703c" : "#ffb26b";
     m.color.lerp(new THREE.Color(c), Math.min(1, dt * 5));
@@ -174,7 +191,7 @@ function Glow({ state, reveal, y, radius }) {
   );
 }
 
-function Model({ target, state, reveal, neglect }) {
+function Model({ target, state, reveal, neglect, hover }) {
   const { scene } = useGLTF(target.url);
   const { camera } = useThree();
   const worldPos = useMemo(
@@ -217,7 +234,7 @@ function Model({ target, state, reveal, neglect }) {
   return (
     <group ref={groupRef}>
       <group scale={scale}><primitive object={cloned} /></group>
-      <Glow state={state} reveal={reveal} y={scale * 0.75} radius={scale * 0.28} />
+      <Glow state={state} reveal={reveal} hover={hover} y={scale * 0.75} radius={scale * 0.28} />
     </group>
   );
 }
@@ -261,14 +278,14 @@ class ModelBoundary extends Component {
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-export function Target({ target, state, reveal, neglect }) {
+export function Target({ target, state, reveal, neglect, hover }) {
   const box = <Box target={target} state={state} reveal={reveal} />;
   return (
     <group position={target.position} userData={{ id: target.id }}>
       {target.url ? (
         <ModelBoundary url={target.url} fallback={box}>
           <Suspense fallback={box}>
-            <Model target={target} state={state} reveal={reveal} neglect={neglect} />
+            <Model target={target} state={state} reveal={reveal} neglect={neglect} hover={hover} />
           </Suspense>
         </ModelBoundary>
       ) : box}
