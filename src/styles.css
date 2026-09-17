@@ -135,6 +135,12 @@ code { font-family: ui-monospace, monospace; background: #21262d; padding: 1px 6
   padding: 40px 22px; background:
     radial-gradient(1100px 620px at 50% -14%, #16202b 0%, #0d1117 62%); }
 .home-inner { max-width: 880px; width: 100%; text-align: center; }
+.parent { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 26px;
+  padding: 7px 15px; border: 1px solid #25303b; border-radius: 999px;
+  color: #7a8898; text-decoration: none; font-size: 13px;
+  transition: color .18s, border-color .18s; }
+.parent:hover { color: #cbd5df; border-color: #3d6b8f; }
+.parent .hex { color: #69a8e8; font-size: 11px; }
 .home h1 { font-size: clamp(44px, 9vw, 76px); margin: 0 0 16px; letter-spacing: -.03em; }
 .tagline { color: #a3b1c0; font-size: clamp(15px, 2.2vw, 18px); max-width: 54ch;
   margin: 0 auto 40px; line-height: 1.6; }

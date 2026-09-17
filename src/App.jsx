@@ -11,6 +11,9 @@ export default function App() {
   return (
     <div className="home">
       <div className="home-inner">
+        <a className="parent" href="https://emergencia-grid-cells.vercel.app/">
+          <span className="hex">⬢</span> Part of NeuroPop
+        </a>
         <h1>Hemispace</h1>
         <p className="tagline">
           After a stroke on the right side of the brain, the left half of the world can
