@@ -17,8 +17,9 @@ export default function App() {
         <h1>Hemispace</h1>
         <p className="tagline">
           After a stroke on the right side of the brain, the left half of the world can
-          stop existing — and the person has no idea. Not blindness. Attention.
+          stop existing, and the person has no idea.
         </p>
+        <p className="hook">Not blindness. Attention.</p>
 
         <div className="cards">
           <button className="card" onClick={() => setMode("experience")}>
